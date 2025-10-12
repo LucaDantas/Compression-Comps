@@ -242,9 +242,20 @@ public:
     // Accessors
     int getChunkSize() { return chunkSize; }
     TransformSpace getTransformSpace() { return transformSpace; }
+    
+    // Const versions of accessors
+    int getChunkSize() const { return chunkSize; }
+    TransformSpace getTransformSpace() const { return transformSpace; }
 
     // Channel accessors
     std::vector<std::vector<uint8_t>>& getChannel(int idx) { 
+        if (idx < 0 || idx >= 3) {
+            throw std::runtime_error("Invalid channel index. Must be 0, 1, or 2");
+        }
+        return channels[idx]; 
+    }
+    
+    const std::vector<std::vector<uint8_t>>& getChannel(int idx) const { 
         if (idx < 0 || idx >= 3) {
             throw std::runtime_error("Invalid channel index. Must be 0, 1, or 2");
         }
@@ -414,6 +425,79 @@ public:
         return chunks[chunkR][chunkC];
     }
 
+    // Get string representation of transform space
+    std::string getTransformSpaceString() {
+        switch (transformSpace) {
+            case TransformSpace::rawRGB: return "rawRGB";
+            case TransformSpace::rawYCbCr: return "rawYCbCr";
+            case TransformSpace::DCT: return "DCT";
+            case TransformSpace::DWT: return "DWT";
+            case TransformSpace::SP: return "SP";
+            default: return "Unknown";
+        }
+    }
+};
+
+// Abstract base class for image transforms
+class Transform {
+protected:
+    TransformedChunkedImage transformedChunkedImage;
+    TransformSpace transformSpace;
+
+public:
+    // Constructor that takes an Image and initializes it into a TransformedChunkedImage
+    Transform(const Image& image, int chunkSize = 8, TransformSpace space = TransformSpace::rawRGB) 
+        : transformedChunkedImage(image, chunkSize, space), transformSpace(space) {}
+    
+    // Virtual destructor for proper inheritance
+    virtual ~Transform() = default;
+    
+    // Pure virtual methods to be implemented by derived classes
+    virtual TransformedChunk encodeChunk(const TransformedChunk& inputChunk) = 0;
+    virtual TransformedChunk decodeChunk(const TransformedChunk& encodedChunk) = 0;
+    
+    // Already implemented method that applies encoding to each chunk
+    TransformedChunkedImage applyTransform() {
+        // Create a copy of the original chunked image
+        TransformedChunkedImage result = transformedChunkedImage;
+        
+        // Apply encoding to each chunk
+        for (int i = 0; i < result.getTotalChunks(); i++) {
+            TransformedChunk& inputChunk = transformedChunkedImage.getChunkAt(i);
+            TransformedChunk encodedChunk = encodeChunk(inputChunk);
+            
+            // Copy encoded chunk to result
+            TransformedChunk& resultChunk = result.getChunkAt(i);
+            resultChunk = encodedChunk;
+        }
+        
+        return result;
+    }
+    
+    // Method to apply both encoding and decoding (for testing)
+    TransformedChunkedImage applyFullTransform() {
+        TransformedChunkedImage encoded = applyTransform();
+        TransformedChunkedImage result = encoded;
+        
+        // Apply decoding to each encoded chunk
+        for (int i = 0; i < result.getTotalChunks(); i++) {
+            TransformedChunk& encodedChunk = encoded.getChunkAt(i);
+            TransformedChunk decodedChunk = decodeChunk(encodedChunk);
+            
+            // Copy decoded chunk to result
+            TransformedChunk& resultChunk = result.getChunkAt(i);
+            resultChunk = decodedChunk;
+        }
+        
+        return result;
+    }
+    
+    // Accessor methods
+    TransformedChunkedImage& getTransformedChunkedImage() { return transformedChunkedImage; }
+    TransformSpace getTransformSpace() { return transformSpace; }
+    int getChunkSize() { return transformedChunkedImage.getChunkSize(); }
+    int getTotalChunks() { return transformedChunkedImage.getTotalChunks(); }
+    
     // Get string representation of transform space
     std::string getTransformSpaceString() {
         switch (transformSpace) {
