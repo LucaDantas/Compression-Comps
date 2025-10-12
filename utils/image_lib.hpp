@@ -179,190 +179,52 @@ public:
     }
 };
 
-class ImageChunk {
-private:
-    int chunkSize; // Variable chunk size, set once during construction
-    std::vector<std::vector<Pixel>> pixels;
-    int chunkRow, chunkCol; // Position of this chunk in the original image
-
-public:
-    // Constructors
-    ImageChunk(int size = 8) : chunkSize(size), chunkRow(0), chunkCol(0) {
-        pixels.resize(chunkSize, std::vector<Pixel>(chunkSize));
-    }
-    
-    ImageChunk(int size, int row, int col) : chunkSize(size), chunkRow(row), chunkCol(col) {
-        pixels.resize(chunkSize, std::vector<Pixel>(chunkSize));
-    }
-
-    // Accessors
-    int getChunkSize() const { return chunkSize; }
-    int getChunkRow() const { return chunkRow; }
-    int getChunkCol() const { return chunkCol; }
-    Pixel& getPixel(int row, int col) { return pixels[row][col]; }
-    const Pixel& getPixel(int row, int col) const { return pixels[row][col]; }
-
-    // Set pixel at local coordinates within the chunk
-    void setPixel(int row, int col, const Pixel& pixel) {
-        if (row >= 0 && row < chunkSize && col >= 0 && col < chunkSize) {
-            pixels[row][col] = pixel;
-        }
-    }
-
-    // Convert all pixels in chunk to specified color space
-    void convertToColorSpace(ColorSpace targetSpace) {
-        for (int i = 0; i < chunkSize; i++) {
-            for (int j = 0; j < chunkSize; j++) {
-                if (targetSpace == ColorSpace::YCbCr) {
-                    pixels[i][j].convertToYCbCr();
-                } else {
-                    pixels[i][j].convertToRGB();
-                }
-            }
-        }
-    }
-};
-
-class ChunkedImage {
-private:
-    int originalRows, originalColumns;
-    int chunkRows, chunkColumns;
-    int chunkSize;
-    std::vector<std::vector<ImageChunk>> chunks;
-    ColorSpace colorSpace;
-
-public:
-    // Constructor from Image object
-    ChunkedImage(const Image& image, int size = 8) : chunkSize(size) {
-        originalRows = image.getRows();
-        originalColumns = image.getColumns();
-        colorSpace = ColorSpace::RGB; // Default, will be updated if needed
-        
-        // Calculate number of chunks needed
-        chunkRows = (originalRows + chunkSize - 1) / chunkSize;
-        chunkColumns = (originalColumns + chunkSize - 1) / chunkSize;
-        
-        // Initialize chunk grid
-        chunks.resize(chunkRows, std::vector<ImageChunk>(chunkColumns));
-        
-        // Populate chunks from image
-        for (int chunkR = 0; chunkR < chunkRows; chunkR++) {
-            for (int chunkC = 0; chunkC < chunkColumns; chunkC++) {
-                chunks[chunkR][chunkC] = ImageChunk(chunkSize, chunkR, chunkC);
-                
-                // Copy pixels from image to chunk
-                for (int i = 0; i < chunkSize; i++) {
-                    for (int j = 0; j < chunkSize; j++) {
-                        int imgRow = chunkR * chunkSize + i;
-                        int imgCol = chunkC * chunkSize + j;
-                        
-                        if (imgRow < originalRows && imgCol < originalColumns) {
-                            chunks[chunkR][chunkC].setPixel(i, j, image.getPixel(imgRow, imgCol));
-                        } else {
-                            // Pad with black pixels if image doesn't fill the chunk
-                            chunks[chunkR][chunkC].setPixel(i, j, Pixel(0, 0, 0));
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Default constructor
-    ChunkedImage() : originalRows(0), originalColumns(0), chunkRows(0), chunkColumns(0), chunkSize(8), colorSpace(ColorSpace::RGB) {}
-
-    // Accessors
-    int getOriginalRows() const { return originalRows; }
-    int getOriginalColumns() const { return originalColumns; }
-    int getChunkRows() const { return chunkRows; }
-    int getChunkColumns() const { return chunkColumns; }
-    int getChunkSize() const { return chunkSize; }
-    ColorSpace getColorSpace() const { return colorSpace; }
-    ImageChunk& getChunk(int chunkRow, int chunkCol) { return chunks[chunkRow][chunkCol]; }
-    const ImageChunk& getChunk(int chunkRow, int chunkCol) const { return chunks[chunkRow][chunkCol]; }
-
-    // Convert all chunks to specified color space
-    void convertToColorSpace(ColorSpace targetSpace) {
-        colorSpace = targetSpace;
-        for (int i = 0; i < chunkRows; i++) {
-            for (int j = 0; j < chunkColumns; j++) {
-                chunks[i][j].convertToColorSpace(targetSpace);
-            }
-        }
-    }
-
-    // Convert back to Image object
-    Image toImage() const {
-        Image result(originalRows, originalColumns);
-        
-        for (int chunkR = 0; chunkR < chunkRows; chunkR++) {
-            for (int chunkC = 0; chunkC < chunkColumns; chunkC++) {
-                const ImageChunk& chunk = chunks[chunkR][chunkC];
-                
-                for (int i = 0; i < chunkSize; i++) {
-                    for (int j = 0; j < chunkSize; j++) {
-                        int imgRow = chunkR * chunkSize + i;
-                        int imgCol = chunkC * chunkSize + j;
-                        
-                        if (imgRow < originalRows && imgCol < originalColumns) {
-                            result.getPixel(imgRow, imgCol) = chunk.getPixel(i, j);
-                        }
-                    }
-                }
-            }
-        }
-        
-        return result;
-    }
-
-    // Get total number of chunks
-    int getTotalChunks() const {
-        return chunkRows * chunkColumns;
-    }
-
-    // Get chunk at linear index (for iteration)
-    ImageChunk& getChunkAt(int index) {
-        int chunkR = index / chunkColumns;
-        int chunkC = index % chunkColumns;
-        return chunks[chunkR][chunkC];
-    }
-
-    const ImageChunk& getChunkAt(int index) const {
-        int chunkR = index / chunkColumns;
-        int chunkC = index % chunkColumns;
-        return chunks[chunkR][chunkC];
-    }
-};
-
 class TransformedChunk {
 private:
     int chunkSize; // Size of the square chunk
-    int chunkRow, chunkCol; // Position of this chunk in the original image
     TransformSpace transformSpace; // Current transform space
     
-    // Separate grids for each color channel
-    std::vector<std::vector<uint8_t>> channel1; // R or Y channel
-    std::vector<std::vector<uint8_t>> channel2; // G or Cb channel
-    std::vector<std::vector<uint8_t>> channel3; // B or Cr channel
+    // Array of channels - can access with channel[idx]
+    std::vector<std::vector<std::vector<uint8_t>>> channels; // channels[channel_idx][row][col]
 
 public:
     // Constructors
-    TransformedChunk(int size = 8) : chunkSize(size), chunkRow(0), chunkCol(0), transformSpace(TransformSpace::rawRGB) {
+    TransformedChunk(int size = 8, TransformSpace space = TransformSpace::rawRGB) : chunkSize(size), transformSpace(space) {
         initializeChannels();
     }
     
-    TransformedChunk(int size, int row, int col, TransformSpace space = TransformSpace::rawRGB) 
-        : chunkSize(size), chunkRow(row), chunkCol(col), transformSpace(space) {
-        initializeChannels();
+    
+    // Constructor with direct channel data
+    TransformedChunk(const std::vector<std::vector<std::vector<uint8_t>>>& channelData, TransformSpace space) 
+        : transformSpace(space) {
+        if (channelData.size() != 3) {
+            throw std::runtime_error("TransformedChunk requires exactly 3 channels");
+        }
+        
+        chunkSize = channelData[0].size();
+        if (channelData[0].empty() || channelData[0][0].size() != chunkSize) {
+            throw std::runtime_error("Invalid channel data dimensions");
+        }
+        
+        // Verify all channels have the same dimensions
+        for (int ch = 0; ch < 3; ch++) {
+            if (channelData[ch].size() != chunkSize) {
+                throw std::runtime_error("All channels must have the same dimensions");
+            }
+            for (int i = 0; i < chunkSize; i++) {
+                if (channelData[ch][i].size() != chunkSize) {
+                    throw std::runtime_error("All channels must be square");
+                }
+            }
+        }
+        
+        channels = channelData;
     }
 
     // Copy constructor
     TransformedChunk(const TransformedChunk& other) 
-        : chunkSize(other.chunkSize), chunkRow(other.chunkRow), chunkCol(other.chunkCol), 
-          transformSpace(other.transformSpace) {
-        channel1 = other.channel1;
-        channel2 = other.channel2;
-        channel3 = other.channel3;
+        : chunkSize(other.chunkSize), transformSpace(other.transformSpace) {
+        channels = other.channels;
     }
 
     // Copy assignment operator
@@ -371,129 +233,22 @@ public:
             if (chunkSize != other.chunkSize) {
                 throw std::runtime_error("Cannot assign TransformedChunk with different chunk size");
             }
-            chunkRow = other.chunkRow;
-            chunkCol = other.chunkCol;
             transformSpace = other.transformSpace;
-            channel1 = other.channel1;
-            channel2 = other.channel2;
-            channel3 = other.channel3;
+            channels = other.channels;
         }
         return *this;
     }
 
     // Accessors
-    int getChunkSize() const { return chunkSize; }
-    int getChunkRow() const { return chunkRow; }
-    int getChunkCol() const { return chunkCol; }
-    TransformSpace getTransformSpace() const { return transformSpace; }
+    int getChunkSize() { return chunkSize; }
+    TransformSpace getTransformSpace() { return transformSpace; }
 
     // Channel accessors
-    std::vector<std::vector<uint8_t>>& getChannel1() { return channel1; }
-    const std::vector<std::vector<uint8_t>>& getChannel1() const { return channel1; }
-    
-    std::vector<std::vector<uint8_t>>& getChannel2() { return channel2; }
-    const std::vector<std::vector<uint8_t>>& getChannel2() const { return channel2; }
-    
-    std::vector<std::vector<uint8_t>>& getChannel3() { return channel3; }
-    const std::vector<std::vector<uint8_t>>& getChannel3() const { return channel3; }
-
-    // RGB channel accessors (for rawRGB transform space)
-    std::vector<std::vector<uint8_t>>& getRChannel() { 
-        if (transformSpace != TransformSpace::rawRGB) {
-            throw std::runtime_error("Cannot get R channel: not in rawRGB transform space");
+    std::vector<std::vector<uint8_t>>& getChannel(int idx) { 
+        if (idx < 0 || idx >= 3) {
+            throw std::runtime_error("Invalid channel index. Must be 0, 1, or 2");
         }
-        return channel1; 
-    }
-    
-    std::vector<std::vector<uint8_t>>& getGChannel() { 
-        if (transformSpace != TransformSpace::rawRGB) {
-            throw std::runtime_error("Cannot get G channel: not in rawRGB transform space");
-        }
-        return channel2; 
-    }
-    
-    std::vector<std::vector<uint8_t>>& getBChannel() { 
-        if (transformSpace != TransformSpace::rawRGB) {
-            throw std::runtime_error("Cannot get B channel: not in rawRGB transform space");
-        }
-        return channel3; 
-    }
-
-    // YCbCr channel accessors (for rawYCbCr transform space)
-    std::vector<std::vector<uint8_t>>& getYChannel() { 
-        if (transformSpace != TransformSpace::rawYCbCr) {
-            throw std::runtime_error("Cannot get Y channel: not in rawYCbCr transform space");
-        }
-        return channel1; 
-    }
-    
-    std::vector<std::vector<uint8_t>>& getCbChannel() { 
-        if (transformSpace != TransformSpace::rawYCbCr) {
-            throw std::runtime_error("Cannot get Cb channel: not in rawYCbCr transform space");
-        }
-        return channel2; 
-    }
-    
-    std::vector<std::vector<uint8_t>>& getCrChannel() { 
-        if (transformSpace != TransformSpace::rawYCbCr) {
-            throw std::runtime_error("Cannot get Cr channel: not in rawYCbCr transform space");
-        }
-        return channel3; 
-    }
-
-    // DCT coefficient accessors (for DCT transform space)
-    std::vector<std::vector<uint8_t>>& getDCTChannel1() { 
-        if (transformSpace != TransformSpace::DCT) {
-            throw std::runtime_error("Cannot get DCT channel 1: not in DCT transform space");
-        }
-        return channel1; 
-    }
-    
-    std::vector<std::vector<uint8_t>>& getDCTChannel2() { 
-        if (transformSpace != TransformSpace::DCT) {
-            throw std::runtime_error("Cannot get DCT channel 2: not in DCT transform space");
-        }
-        return channel2; 
-    }
-    
-    std::vector<std::vector<uint8_t>>& getDCTChannel3() { 
-        if (transformSpace != TransformSpace::DCT) {
-            throw std::runtime_error("Cannot get DCT channel 3: not in DCT transform space");
-        }
-        return channel3; 
-    }
-
-    // Set individual coefficient value
-    void setCoefficient(int channel, int row, int col, uint8_t value) {
-        if (channel < 1 || channel > 3) {
-            throw std::runtime_error("Invalid channel number. Must be 1, 2, or 3");
-        }
-        if (row < 0 || row >= chunkSize || col < 0 || col >= chunkSize) {
-            throw std::runtime_error("Invalid coefficient position");
-        }
-        
-        switch (channel) {
-            case 1: channel1[row][col] = value; break;
-            case 2: channel2[row][col] = value; break;
-            case 3: channel3[row][col] = value; break;
-        }
-    }
-
-    // Get individual coefficient value
-    uint8_t getCoefficient(int channel, int row, int col) const {
-        if (channel < 1 || channel > 3) {
-            throw std::runtime_error("Invalid channel number. Must be 1, 2, or 3");
-        }
-        if (row < 0 || row >= chunkSize || col < 0 || col >= chunkSize) {
-            throw std::runtime_error("Invalid coefficient position");
-        }
-        
-        switch (channel) {
-            case 1: return channel1[row][col];
-            case 2: return channel2[row][col];
-            case 3: return channel3[row][col];
-            default: return 0;
-        }
+        return channels[idx]; 
     }
 
     // Set transform space (doesn't convert data, just changes interpretation)
@@ -503,22 +258,22 @@ public:
 
     // Clear all channels (set to zero)
     void clear() {
-        for (int i = 0; i < chunkSize; i++) {
-            for (int j = 0; j < chunkSize; j++) {
-                channel1[i][j] = 0;
-                channel2[i][j] = 0;
-                channel3[i][j] = 0;
+        for (int ch = 0; ch < 3; ch++) {
+            for (int i = 0; i < chunkSize; i++) {
+                for (int j = 0; j < chunkSize; j++) {
+                    channels[ch][i][j] = 0;
+                }
             }
         }
     }
 
     // Fill all channels with a specific value
     void fill(uint8_t value) {
-        for (int i = 0; i < chunkSize; i++) {
-            for (int j = 0; j < chunkSize; j++) {
-                channel1[i][j] = value;
-                channel2[i][j] = value;
-                channel3[i][j] = value;
+        for (int ch = 0; ch < 3; ch++) {
+            for (int i = 0; i < chunkSize; i++) {
+                for (int j = 0; j < chunkSize; j++) {
+                    channels[ch][i][j] = value;
+                }
             }
         }
     }
@@ -538,8 +293,138 @@ public:
 private:
     // Initialize all channels with zeros
     void initializeChannels() {
-        channel1.resize(chunkSize, std::vector<uint8_t>(chunkSize, 0));
-        channel2.resize(chunkSize, std::vector<uint8_t>(chunkSize, 0));
-        channel3.resize(chunkSize, std::vector<uint8_t>(chunkSize, 0));
+        channels.resize(3); // 3 channels
+        for (int ch = 0; ch < 3; ch++) {
+            channels[ch].resize(chunkSize, std::vector<uint8_t>(chunkSize, 0));
+        }
     }
 };
+
+class TransformedChunkedImage {
+private:
+    int originalRows, originalColumns;
+    int chunkRows, chunkColumns;
+    int chunkSize;
+    std::vector<std::vector<TransformedChunk>> chunks;
+    TransformSpace transformSpace;
+
+public:
+    // Constructor from Image object (creates chunks and converts to TransformedChunk)
+    TransformedChunkedImage(const Image& image, int size = 8, TransformSpace space = TransformSpace::rawRGB) 
+        : chunkSize(size), transformSpace(space) {
+        
+        originalRows = image.getRows();
+        originalColumns = image.getColumns();
+        
+        // Calculate number of chunks needed
+        chunkRows = (originalRows + chunkSize - 1) / chunkSize;
+        chunkColumns = (originalColumns + chunkSize - 1) / chunkSize;
+        
+        // Initialize chunk grid
+        chunks.resize(chunkRows, std::vector<TransformedChunk>(chunkColumns));
+        
+        // Create chunks directly from image pixels
+        for (int chunkR = 0; chunkR < chunkRows; chunkR++) {
+            for (int chunkC = 0; chunkC < chunkColumns; chunkC++) {
+                // Create TransformedChunk directly
+                TransformedChunk transformedChunk(chunkSize, space);
+                
+                // Copy pixels from image to channels
+                for (int i = 0; i < chunkSize; i++) {
+                    for (int j = 0; j < chunkSize; j++) {
+                        int imgRow = chunkR * chunkSize + i;
+                        int imgCol = chunkC * chunkSize + j;
+                        
+                        if (imgRow < originalRows && imgCol < originalColumns) {
+                            const Pixel& pixel = image.getPixel(imgRow, imgCol);
+                            if (space == TransformSpace::rawRGB) {
+                                // Ensure pixel is in RGB color space
+                                Pixel rgbPixel = pixel;
+                                if (pixel.getColorSpace() == ColorSpace::YCbCr) {
+                                    rgbPixel.convertToRGB();
+                                }
+                                transformedChunk.getChannel(0)[i][j] = rgbPixel.getR();
+                                transformedChunk.getChannel(1)[i][j] = rgbPixel.getG();
+                                transformedChunk.getChannel(2)[i][j] = rgbPixel.getB();
+                            } else if (space == TransformSpace::rawYCbCr) {
+                                // Convert pixel to YCbCr if needed
+                                Pixel ycbcrPixel = pixel;
+                                if (pixel.getColorSpace() == ColorSpace::RGB) {
+                                    ycbcrPixel.convertToYCbCr();
+                                }
+                                transformedChunk.getChannel(0)[i][j] = ycbcrPixel.getY();
+                                transformedChunk.getChannel(1)[i][j] = ycbcrPixel.getCb();
+                                transformedChunk.getChannel(2)[i][j] = ycbcrPixel.getCr();
+                            } else {
+                                // For other transform spaces, start with RGB data
+                                Pixel rgbPixel = pixel;
+                                if (pixel.getColorSpace() == ColorSpace::YCbCr) {
+                                    rgbPixel.convertToRGB();
+                                }
+                                transformedChunk.getChannel(0)[i][j] = rgbPixel.getR();
+                                transformedChunk.getChannel(1)[i][j] = rgbPixel.getG();
+                                transformedChunk.getChannel(2)[i][j] = rgbPixel.getB();
+                            }
+                        } else {
+                            // Pad with black pixels if image doesn't fill the chunk
+                            transformedChunk.getChannel(0)[i][j] = 0;
+                            transformedChunk.getChannel(1)[i][j] = 0;
+                            transformedChunk.getChannel(2)[i][j] = 0;
+                        }
+                    }
+                }
+                
+                chunks[chunkR][chunkC] = transformedChunk;
+            }
+        }
+    }
+
+    // Default constructor
+    TransformedChunkedImage() : originalRows(0), originalColumns(0), chunkRows(0), chunkColumns(0), chunkSize(8), transformSpace(TransformSpace::rawRGB) {}
+
+    // Accessors
+    int getOriginalRows() { return originalRows; }
+    int getOriginalColumns() { return originalColumns; }
+    int getChunkRows() { return chunkRows; }
+    int getChunkColumns() { return chunkColumns; }
+    int getChunkSize() { return chunkSize; }
+    TransformSpace getTransformSpace() { return transformSpace; }
+    
+    TransformedChunk& getChunk(int chunkRow, int chunkCol) { return chunks[chunkRow][chunkCol]; }
+
+    // Set transform space for all chunks (doesn't convert data, just changes interpretation)
+    void setTransformSpace(TransformSpace space) {
+        transformSpace = space;
+        for (int i = 0; i < chunkRows; i++) {
+            for (int j = 0; j < chunkColumns; j++) {
+                chunks[i][j].setTransformSpace(space);
+            }
+        }
+    }
+
+    // Get total number of chunks
+    int getTotalChunks() {
+        return chunkRows * chunkColumns;
+    }
+
+    // Get chunk at linear index (for iteration)
+    TransformedChunk& getChunkAt(int index) {
+        int chunkR = index / chunkColumns;
+        int chunkC = index % chunkColumns;
+        return chunks[chunkR][chunkC];
+    }
+
+    // Get string representation of transform space
+    std::string getTransformSpaceString() {
+        switch (transformSpace) {
+            case TransformSpace::rawRGB: return "rawRGB";
+            case TransformSpace::rawYCbCr: return "rawYCbCr";
+            case TransformSpace::DCT: return "DCT";
+            case TransformSpace::DWT: return "DWT";
+            case TransformSpace::SP: return "SP";
+            default: return "Unknown";
+        }
+    }
+};
+
+
