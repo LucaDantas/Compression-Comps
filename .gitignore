@@ -1,0 +1,22 @@
+# Compiled executables
+*.exe
+*.obj
+*.o
+
+# IDE files
+.vscode/
+*.suo
+*.vcxproj.user
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
