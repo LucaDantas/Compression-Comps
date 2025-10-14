@@ -1,23 +1,23 @@
 #include <cmath>
+#include "image_lib.hpp"
 
 // Example implementation: DCT Transform
 class DCTTransform : public Transform {
 public:
     // Constructor specifies DCT transform space
-    DCTTransform(const Image& image, int chunkSize = 8) 
-        : Transform(image, chunkSize, TransformSpace::DCT) {}
+    DCTTransform() : Transform(DataSpace::DCT) {}
     
     // Implement encodeChunk - simple example that just copies data
-    TransformedChunk encodeChunk(const TransformedChunk& inputChunk) {
-        TransformedChunk result(inputChunk.getChunkSize(), TransformSpace::DCT);
+    TransformChunk encodeChunk(const TransformChunk& inputChunk) {
+        TransformChunk result(inputChunk.getChunkSize(), DataSpace::DCT);
         double sum, cu, cv;
         int pixel;
         int n = inputChunk.getChunkSize();
 
         // Simple example: copy all channel data
         for (int ch = 0; ch < 3; ch++) {
-            const std::vector<std::vector<uint8_t>>& inputChannel = inputChunk.getChannel(ch);
-            std::vector<std::vector<uint8_t>>& resultChannel = result.getChannel(ch);
+            const std::vector<std::vector<int>>& inputChannel = inputChunk[ch];
+            std::vector<std::vector<int>>& resultChannel = result[ch];
             for (int u = 0; u < n; u++) {
                 for (int v = 0; v < n; v++) {
                     sum = 0;
@@ -38,16 +38,16 @@ public:
     }
     
     // Implement decodeChunk - simple example that just copies data back
-    TransformedChunk decodeChunk(const TransformedChunk& encodedChunk) {
-        TransformedChunk result(encodedChunk.getChunkSize(), TransformSpace::rawRGB);
+    TransformChunk decodeChunk(const TransformChunk& encodedChunk) {
+        TransformChunk result(encodedChunk.getChunkSize(), DataSpace::RGB);
         double sum, cu, cv;
         int pixel;
         int n = encodedChunk.getChunkSize();
 
         // Simple example: copy all channel data back
         for (int ch = 0; ch < 3; ch++) {
-            const std::vector<std::vector<uint8_t>>& encodedChannel = encodedChunk.getChannel(ch);
-            std::vector<std::vector<uint8_t>>& resultChannel = result.getChannel(ch);
+            const std::vector<std::vector<int>>& encodedChannel = encodedChunk[ch];
+            std::vector<std::vector<int>>& resultChannel = result[ch];
             
             for (int i = 0; i < n; i++) {
                 for (int j = 0; j < n; j++) {
