@@ -9,12 +9,16 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-enum class DataSpace {
-    RGB,        // Raw RGB
-    YCbCr,      // Raw YCbCr
+enum class TransformSpace {
+    Raw,        // Raw image data
     DCT,        // Discrete Cosine Transform
     DWT,        // Discrete Wavelet Transform
     SP          // S+P Transform
+};
+
+enum class ColorSpace {
+    RGB,
+    YCbCr
 };
 
 class Pixel {
@@ -84,11 +88,12 @@ class Image {
 private:
     int rows, columns;
     std::vector<std::vector<Pixel>> pixels;
-    DataSpace dataSpace;
+    TransformSpace transformSpace;
+    ColorSpace colorSpace;
 
 public:
     // always reads RGB in from a file
-    Image(const std::string& filename) : dataSpace(DataSpace::RGB) {
+    Image(const std::string& filename) : transformSpace(TransformSpace::Raw), colorSpace(ColorSpace::RGB) {
         int width, height, channels;
         unsigned char* data = stbi_load(filename.c_str(), &width, &height, &channels, 3);
         
@@ -114,33 +119,40 @@ public:
         stbi_image_free(data);
     }
 
+    // TODO: Add a constructor that can take in a transformed image
+
     // Accessors
     int getRows() const { return rows; }
     int getColumns() const { return columns; }
     const Pixel& getPixel(int row, int col) const { return pixels[row][col]; }
-    DataSpace getDataSpace() const { return dataSpace; }
+    TransformSpace getTransformSpace() const { return transformSpace; }
+    ColorSpace getColorSpace() const { return colorSpace; }
 
     // Color space conversion methods
     void convertToRGB() {
-        assert(dataSpace == DataSpace::YCbCr && "convertToRGB() can only be called when dataSpace is YCbCr");
+        assert(transformSpace == TransformSpace::Raw && "convertToRGB() can only be called when transformSpace is Raw");
+        assert(colorSpace == ColorSpace::YCbCr && "convertToRGB() can only be called when colorSpace is YCbCr");
         
         for (int row = 0; row < rows; row++) {
             for (int col = 0; col < columns; col++) {
                 pixels[row][col].convertToRGB();
             }
         }
-        dataSpace = DataSpace::RGB;
+        transformSpace = TransformSpace::Raw;
+        colorSpace = ColorSpace::RGB;
     }
     
     void convertToYCbCr() {
-        assert(dataSpace == DataSpace::RGB && "convertToYCbCr() can only be called when dataSpace is RGB");
+        assert(transformSpace == TransformSpace::Raw && "convertToYCbCr() can only be called when transformSpace is Raw");
+        assert(colorSpace == ColorSpace::RGB && "convertToYCbCr() can only be called when colorSpace is RGB");
         
         for (int row = 0; row < rows; row++) {
             for (int col = 0; col < columns; col++) {
                 pixels[row][col].convertToYCbCr();
             }
         }
-        dataSpace = DataSpace::YCbCr;
+        transformSpace = TransformSpace::Raw;
+        colorSpace = ColorSpace::YCbCr;
     }
 };
 
@@ -183,12 +195,13 @@ private:
     int chunkRows, chunkColumns; // how many rows and columns of CHUNKS there are
     int chunkSize;
     std::vector<std::vector<Chunk>> chunks;
-    DataSpace dataSpace; // which data space we are using, RGB, YCbCr, DCT, DWT, SP
+    TransformSpace transformSpace; // which transform space we are using, RGB, YCbCr, DCT, DWT, SP
+    ColorSpace colorSpace; // which color space we are using, RGB or YCbCr
 
 public:
     // Constructor from Image object
-    ChunkedImage(const Image& image, int chunkSize = 8) 
-        : chunkSize(chunkSize), dataSpace(image.getDataSpace()) {
+    ChunkedImage(const Image& image, int chunkSize) 
+        : chunkSize(chunkSize), transformSpace(image.getTransformSpace()), colorSpace(image.getColorSpace()) {
         
         originalRows = image.getRows();
         originalColumns = image.getColumns();
@@ -229,9 +242,9 @@ public:
     }
     
     // Constructor with explicit parameters
-    ChunkedImage(int originalRows, int originalColumns, DataSpace dataSpace, int chunkSize = 8)
+    ChunkedImage(int originalRows, int originalColumns, TransformSpace transformSpace, ColorSpace colorSpace, int chunkSize = 8)
         : originalRows(originalRows), originalColumns(originalColumns), 
-          chunkSize(chunkSize), dataSpace(dataSpace) {
+          chunkSize(chunkSize), transformSpace(transformSpace), colorSpace(colorSpace) {
         
         // Calculate number of chunks needed
         chunkRows = (originalRows + chunkSize - 1) / chunkSize;
@@ -247,7 +260,8 @@ public:
     int getChunkRows() { return chunkRows; }
     int getChunkColumns() { return chunkColumns; }
     int getChunkSize() { return chunkSize; }
-    DataSpace getDataSpace() const { return dataSpace; }
+    TransformSpace getTransformSpace() const { return transformSpace; }
+    ColorSpace getColorSpace() const { return colorSpace; }
     
     Chunk& getChunk(int chunkRow, int chunkCol) { return chunks[chunkRow][chunkCol]; }
 
@@ -270,31 +284,36 @@ public:
         return chunks[chunkR][chunkC];
     }
 
-    // Get string representation of data space
-    std::string getDataSpaceString() {
-        switch (dataSpace) {
-            case DataSpace::RGB: return "RGB";
-            case DataSpace::YCbCr: return "YCbCr";
-            case DataSpace::DCT: return "DCT";
-            case DataSpace::DWT: return "DWT";
-            case DataSpace::SP: return "SP";
+    // Get string representation of transform space
+    std::string getTransformSpaceString() const {
+        switch (transformSpace) {
+            case TransformSpace::Raw: return "Raw";
+            case TransformSpace::DCT: return "DCT";
+            case TransformSpace::DWT: return "DWT";
+            case TransformSpace::SP: return "SP";
             default: return "Unknown";
         }
+    }
+    
+    // Auxiliary function to create a fresh ChunkedImage with same parameters
+    // this is used to create a fresh ChunkedImage with same parameters to store the result of the transform
+    ChunkedImage createFreshCopyForTransformResult(TransformSpace resultTransformSpace) const {
+        return ChunkedImage(originalRows, originalColumns, resultTransformSpace, colorSpace, chunkSize);
     }
 };
 
 // Abstract base class for image transforms
 class Transform {
 protected:
-    DataSpace finalDataSpace;
+    TransformSpace transformSpace;
 
-    // Protected constructor - derived classes must call this and set finalDataSpace
-    Transform(DataSpace dataSpace) : finalDataSpace(dataSpace) {}
+    // Protected constructor - derived classes must call this and set transformSpace
+    Transform(TransformSpace transformSpace) : transformSpace(transformSpace) {}
 
     // Pure virtual methods to be implemented by derived classes
     // These are protected so only derived classes can call them
-    virtual Chunk encodeChunk(const Chunk& inputChunk) = 0;
-    virtual Chunk decodeChunk(const Chunk& encodedChunk) = 0;
+    virtual void encodeChunk(const Chunk& inputChunk, Chunk& outputChunk) = 0;
+    virtual void decodeChunk(const Chunk& encodedChunk, Chunk& outputChunk) = 0;
 
 public:
     // Virtual destructor for proper inheritance
@@ -302,51 +321,60 @@ public:
 
     // Apply transform to a chunked image
     ChunkedImage applyTransform(const ChunkedImage& chunkedImage) {
-        // Create a copy of the original chunked image
-        ChunkedImage result = chunkedImage;
+        // Check that the chunkedImage is in Raw transform space
+        if (chunkedImage.getTransformSpace() != TransformSpace::Raw) {
+            throw std::runtime_error(
+                "ChunkedImage transform space (" + chunkedImage.getTransformSpaceString() + 
+                ") is not Raw. Transform can only be applied to Raw data."
+            );
+        }
+        
+        // Create a fresh ChunkedImage with same parameters but in the transform's final transform space
+        ChunkedImage result = chunkedImage.createFreshCopyForTransformResult(transformSpace);
         
         // Apply encoding to each chunk
         for (int i = 0; i < result.getTotalChunks(); i++) {
             const Chunk& inputChunk = chunkedImage.getChunkAt(i);
-            Chunk encodedChunk = encodeChunk(inputChunk);
-            
-            // Copy encoded chunk to result
             Chunk& resultChunk = result.getChunkAt(i);
-            resultChunk = encodedChunk;
+            encodeChunk(inputChunk, resultChunk);
         }
         
         return result;
     }
     
-    // Method to apply both encoding and decoding (for testing)
-    ChunkedImage applyFullTransform(const ChunkedImage& chunkedImage) {
-        ChunkedImage encoded = applyTransform(chunkedImage);
-        ChunkedImage result = encoded;
+    // Apply inverse transform to a chunked image (decoding)
+    ChunkedImage applyInverseTransform(const ChunkedImage& chunkedImage) {
+        // Check that the chunkedImage is in the correct transform space
+        if (chunkedImage.getTransformSpace() != transformSpace) {
+            throw std::runtime_error(
+                "ChunkedImage transform space (" + chunkedImage.getTransformSpaceString() + 
+                ") does not match transform final transform space (" + getTransformSpaceString() + "). Necessary for inverse transform."
+            );
+        }
         
-        // Apply decoding to each encoded chunk
+        // Create a fresh ChunkedImage with same parameters, but now untransformed
+        ChunkedImage result = chunkedImage.createFreshCopyForTransformResult(TransformSpace::Raw);
+        
+        // Apply decoding to each chunk
         for (int i = 0; i < result.getTotalChunks(); i++) {
-            const Chunk& encodedChunk = encoded.getChunkAt(i);
-            Chunk decodedChunk = decodeChunk(encodedChunk);
-            
-            // Copy decoded chunk to result
+            const Chunk& inputChunk = chunkedImage.getChunkAt(i);
             Chunk& resultChunk = result.getChunkAt(i);
-            resultChunk = decodedChunk;
+            decodeChunk(inputChunk, resultChunk);
         }
         
         return result;
     }
     
     // Accessor methods
-    DataSpace getDataSpace() { return finalDataSpace; }
+    TransformSpace getTransformSpace() const { return transformSpace; }
     
-    // Get string representation of data space
-    std::string getDataSpaceString() {
-        switch (finalDataSpace) {
-            case DataSpace::RGB: return "RGB";
-            case DataSpace::YCbCr: return "YCbCr";
-            case DataSpace::DCT: return "DCT";
-            case DataSpace::DWT: return "DWT";
-            case DataSpace::SP: return "SP";
+    // Get string representation of transform space
+    std::string getTransformSpaceString() const {
+        switch (transformSpace) {
+            case TransformSpace::Raw: return "Raw";
+            case TransformSpace::DCT: return "DCT";
+            case TransformSpace::DWT: return "DWT";
+            case TransformSpace::SP: return "SP";
             default: return "Unknown";
         }
     }
