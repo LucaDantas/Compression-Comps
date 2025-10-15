@@ -1,3 +1,6 @@
+#ifndef DCT_TRANSFORM_HPP
+#define DCT_TRANSFORM_HPP
+
 #include <cmath>
 #include "image_lib.hpp"
 
@@ -57,3 +60,5 @@ public:
         }
     }
 };
+
+#endif // DCT_TRANSFORM_HPP

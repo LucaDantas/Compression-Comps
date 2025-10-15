@@ -1,3 +1,6 @@
+#ifndef IMAGE_LIB_HPP
+#define IMAGE_LIB_HPP
+
 #include <cstdint>
 #include <algorithm>
 #include <vector>
@@ -20,6 +23,25 @@ enum class ColorSpace {
     RGB,
     YCbCr
 };
+
+// Helper functions to convert enums to strings
+std::string colorSpaceToString(ColorSpace colorSpace) {
+    switch (colorSpace) {
+        case ColorSpace::RGB: return "RGB";
+        case ColorSpace::YCbCr: return "YCbCr";
+        default: return "Unknown";
+    }
+}
+
+std::string transformSpaceToString(TransformSpace transformSpace) {
+    switch (transformSpace) {
+        case TransformSpace::Raw: return "Raw";
+        case TransformSpace::DCT: return "DCT";
+        case TransformSpace::DWT: return "DWT";
+        case TransformSpace::SP: return "SP";
+        default: return "Unknown";
+    }
+}
 
 class Pixel {
 private:
@@ -154,6 +176,14 @@ public:
         transformSpace = TransformSpace::Raw;
         colorSpace = ColorSpace::YCbCr;
     }
+    
+    // Print method using helper functions
+    void printInfo() const {
+        std::cout << "Image Info:" << std::endl;
+        std::cout << "  Dimensions: " << rows << "x" << columns << std::endl;
+        std::cout << "  Transform Space: " << transformSpaceToString(transformSpace) << std::endl;
+        std::cout << "  Color Space: " << colorSpaceToString(colorSpace) << std::endl;
+    }
 };
 
 class Chunk {
@@ -255,18 +285,18 @@ public:
     }
 
     // Accessors
-    int getOriginalRows() { return originalRows; }
-    int getOriginalColumns() { return originalColumns; }
-    int getChunkRows() { return chunkRows; }
-    int getChunkColumns() { return chunkColumns; }
-    int getChunkSize() { return chunkSize; }
+    int getOriginalRows() const { return originalRows; }
+    int getOriginalColumns() const { return originalColumns; }
+    int getChunkRows() const { return chunkRows; }
+    int getChunkColumns() const { return chunkColumns; }
+    int getChunkSize() const { return chunkSize; }
     TransformSpace getTransformSpace() const { return transformSpace; }
     ColorSpace getColorSpace() const { return colorSpace; }
     
     Chunk& getChunk(int chunkRow, int chunkCol) { return chunks[chunkRow][chunkCol]; }
 
     // Get total number of chunks
-    int getTotalChunks() {
+    int getTotalChunks() const {
         return chunkRows * chunkColumns;
     }
 
@@ -283,22 +313,22 @@ public:
         int chunkC = index % chunkColumns;
         return chunks[chunkR][chunkC];
     }
-
-    // Get string representation of transform space
-    std::string getTransformSpaceString() const {
-        switch (transformSpace) {
-            case TransformSpace::Raw: return "Raw";
-            case TransformSpace::DCT: return "DCT";
-            case TransformSpace::DWT: return "DWT";
-            case TransformSpace::SP: return "SP";
-            default: return "Unknown";
-        }
-    }
     
     // Auxiliary function to create a fresh ChunkedImage with same parameters
     // this is used to create a fresh ChunkedImage with same parameters to store the result of the transform
     ChunkedImage createFreshCopyForTransformResult(TransformSpace resultTransformSpace) const {
         return ChunkedImage(originalRows, originalColumns, resultTransformSpace, colorSpace, chunkSize);
+    }
+    
+    // Print method using helper functions
+    void printInfo() const {
+        std::cout << "ChunkedImage Info:" << std::endl;
+        std::cout << "  Original Dimensions: " << originalRows << "x" << originalColumns << std::endl;
+        std::cout << "  Chunk Dimensions: " << chunkRows << "x" << chunkColumns << std::endl;
+        std::cout << "  Chunk Size: " << chunkSize << "x" << chunkSize << std::endl;
+        std::cout << "  Total Chunks: " << getTotalChunks() << std::endl;
+        std::cout << "  Transform Space: " << transformSpaceToString(transformSpace) << std::endl;
+        std::cout << "  Color Space: " << colorSpaceToString(colorSpace) << std::endl;
     }
 };
 
@@ -324,7 +354,7 @@ public:
         // Check that the chunkedImage is in Raw transform space
         if (chunkedImage.getTransformSpace() != TransformSpace::Raw) {
             throw std::runtime_error(
-                "ChunkedImage transform space (" + chunkedImage.getTransformSpaceString() + 
+                "ChunkedImage transform space (" + transformSpaceToString(chunkedImage.getTransformSpace()) + 
                 ") is not Raw. Transform can only be applied to Raw data."
             );
         }
@@ -347,8 +377,8 @@ public:
         // Check that the chunkedImage is in the correct transform space
         if (chunkedImage.getTransformSpace() != transformSpace) {
             throw std::runtime_error(
-                "ChunkedImage transform space (" + chunkedImage.getTransformSpaceString() + 
-                ") does not match transform final transform space (" + getTransformSpaceString() + "). Necessary for inverse transform."
+                "ChunkedImage transform space (" + transformSpaceToString(chunkedImage.getTransformSpace()) + 
+                ") does not match transform final transform space (" + transformSpaceToString(transformSpace) + "). Necessary for inverse transform."
             );
         }
         
@@ -367,17 +397,8 @@ public:
     
     // Accessor methods
     TransformSpace getTransformSpace() const { return transformSpace; }
-    
-    // Get string representation of transform space
-    std::string getTransformSpaceString() const {
-        switch (transformSpace) {
-            case TransformSpace::Raw: return "Raw";
-            case TransformSpace::DCT: return "DCT";
-            case TransformSpace::DWT: return "DWT";
-            case TransformSpace::SP: return "SP";
-            default: return "Unknown";
-        }
-    }
 };
+
+#endif // IMAGE_LIB_HPP
 
 
