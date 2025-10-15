@@ -1,12 +1,32 @@
 #include <iostream>
+#include <string>
+#include <stdexcept>
 #include "utils/image_lib.hpp"
 #include "utils/dct_transform.hpp"
 
 
 // for now this is a simple test of the DCT transform
 
-int main() {
-    std::cout << "Starting DCT Transform test..." << std::endl;
+int main(int argc, char* argv[]) {
+    // Parse command line arguments
+    if (argc != 2) {
+        std::cerr << "Usage: " << argv[0] << " <chunk_size>" << std::endl;
+        std::cerr << "Example: " << argv[0] << " 8" << std::endl;
+        return 1;
+    }
+    
+    int chunkSize;
+    try {
+        chunkSize = std::stoi(argv[1]);
+        if (chunkSize <= 0) {
+            throw std::invalid_argument("Chunk size must be positive");
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "Error: Invalid chunk size. " << e.what() << std::endl;
+        return 1;
+    }
+    
+    std::cout << "Starting DCT Transform test with chunk size: " << chunkSize << std::endl;
     
     // Load image from file
     std::cout << "Loading image..." << std::endl;
@@ -14,10 +34,10 @@ int main() {
     std::cout << "Image loaded successfully!" << std::endl;
     img.printInfo();
     
-    // Print some original pixel values (first 8x8 block)
-    std::cout << "\nOriginal image values (first 8x8 block, R channel):" << std::endl;
-    for (int i = 0; i < 8 && i < img.getRows(); i++) {
-        for (int j = 0; j < 8 && j < img.getColumns(); j++) {
+    // Print some original pixel values (first chunk block)
+    std::cout << "\nOriginal image values (first " << chunkSize << "x" << chunkSize << " block, R channel):" << std::endl;
+    for (int i = 0; i < chunkSize && i < img.getRows(); i++) {
+        for (int j = 0; j < chunkSize && j < img.getColumns(); j++) {
             std::cout << img.getPixel(i, j)[0] << "\t";
         }
         std::cout << std::endl;
@@ -30,7 +50,7 @@ int main() {
     
     // Create ChunkedImage from the original image
     std::cout << "\nCreating ChunkedImage..." << std::endl;
-    ChunkedImage chunkedImg(img, 8);
+    ChunkedImage chunkedImg(img, chunkSize);
     std::cout << "ChunkedImage created successfully!" << std::endl;
     chunkedImg.printInfo();
     
@@ -56,8 +76,8 @@ int main() {
     // Print some encoded values (first chunk, R channel)
     std::cout << "\nEncoded DCT values (first chunk, R channel):" << std::endl;
     const Chunk& firstChunk = encodedResult.getChunkAt(0);
-    for (int i = 0; i < 8; i++) {
-        for (int j = 0; j < 8; j++) {
+    for (int i = 0; i < chunkSize; i++) {
+        for (int j = 0; j < chunkSize; j++) {
             std::cout << firstChunk[0][i][j] << "\t";
         }
         std::cout << std::endl;
@@ -76,11 +96,19 @@ int main() {
     double decodedEntropy = decodedImg.getEntropy();
     std::cout << "Decoded image entropy: " << decodedEntropy << " bits per pixel" << std::endl;
     
+    // Save decoded image as PNG
+    std::cout << "\nSaving decoded image as PNG..." << std::endl;
+    if (decodedImg.saveAsPNG("decodedImage.png")) {
+        std::cout << "Decoded image saved successfully as decodedImage.png" << std::endl;
+    } else {
+        std::cout << "Failed to save decoded image as PNG" << std::endl;
+    }
+    
     // Print some decoded values (first chunk, R channel)
     std::cout << "\nDecoded image values (first chunk, R channel):" << std::endl;
     const Chunk& decodedChunk = decodedResult.getChunkAt(0);
-    for (int i = 0; i < 8; i++) {
-        for (int j = 0; j < 8; j++) {
+    for (int i = 0; i < chunkSize; i++) {
+        for (int j = 0; j < chunkSize; j++) {
             std::cout << decodedChunk[0][i][j] << "\t";
         }
         std::cout << std::endl;
@@ -89,8 +117,8 @@ int main() {
     // Compare original vs decoded (first chunk, R channel)
     std::cout << "\nComparison - Original vs Decoded (first chunk, R channel):" << std::endl;
     const Chunk& originalChunk = chunkedImg.getChunkAt(0);
-    for (int i = 0; i < 8; i++) {
-        for (int j = 0; j < 8; j++) {
+    for (int i = 0; i < chunkSize; i++) {
+        for (int j = 0; j < chunkSize; j++) {
             int original = originalChunk[0][i][j];
             int decoded = decodedChunk[0][i][j];
             int diff = original - decoded;
