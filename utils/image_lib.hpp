@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <iostream>
 #include <cassert>
+#include <map>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -103,6 +104,10 @@ public:
     }
 };
 
+// Forward declaration
+class ChunkedImage;
+class Chunk;
+
 // NOTE FOR DOCUMENTATION:
 // To access the data in the pixels use pixels[row][col][channel],
 // opposed to chunkedImage, where the indexing is channels[channel][row][col]
@@ -141,7 +146,10 @@ public:
         stbi_image_free(data);
     }
 
-    // TODO: Add a constructor that can take in a transformed image
+    // Constructor that reconstructs Image from ChunkedImage
+    Image(const ChunkedImage& chunkedImage);
+
+    // TODO: Add a default constructor to be used by the entropy coder reader to create an image
 
     // Accessors
     int getRows() const { return rows; }
@@ -183,6 +191,32 @@ public:
         std::cout << "  Dimensions: " << rows << "x" << columns << std::endl;
         std::cout << "  Transform Space: " << transformSpaceToString(transformSpace) << std::endl;
         std::cout << "  Color Space: " << colorSpaceToString(colorSpace) << std::endl;
+    }
+    
+    // Calculate entropy of the image
+    double getEntropy() const {
+        // Count frequency of each pixel value using map (supports any range)
+        std::map<int, int> frequency;
+        int totalValues = rows * columns * 3; // Total number of values across all channels
+        
+        // Count frequencies across all channels
+        for (int row = 0; row < rows; row++) {
+            for (int col = 0; col < columns; col++) {
+                for (int channel = 0; channel < 3; channel++) {
+                    int value = pixels[row][col][channel];
+                    frequency[value]++;
+                }
+            }
+        }
+        
+        // Calculate entropy
+        double entropy = 0.0;
+        for (const auto& [value, count] : frequency) {
+            double probability = static_cast<double>(count) / totalValues;
+            entropy -= probability * std::log2(probability);
+        }
+        
+        return entropy;
     }
 };
 
@@ -294,6 +328,7 @@ public:
     ColorSpace getColorSpace() const { return colorSpace; }
     
     Chunk& getChunk(int chunkRow, int chunkCol) { return chunks[chunkRow][chunkCol]; }
+    const Chunk& getChunk(int chunkRow, int chunkCol) const { return chunks[chunkRow][chunkCol]; }
 
     // Get total number of chunks
     int getTotalChunks() const {
@@ -331,6 +366,47 @@ public:
         std::cout << "  Color Space: " << colorSpaceToString(colorSpace) << std::endl;
     }
 };
+
+// Implementation of Image constructor that takes ChunkedImage
+inline Image::Image(const ChunkedImage& chunkedImage) : 
+    rows(chunkedImage.getOriginalRows()), 
+    columns(chunkedImage.getOriginalColumns()),
+    transformSpace(chunkedImage.getTransformSpace()),
+    colorSpace(chunkedImage.getColorSpace()) {
+    
+    pixels.resize(rows, std::vector<Pixel>(columns));
+    
+    int chunkSize = chunkedImage.getChunkSize();
+    int chunkRows = chunkedImage.getChunkRows();
+    int chunkColumns = chunkedImage.getChunkColumns();
+    
+    // Copy data from chunks back to pixel array
+    for (int chunkRow = 0; chunkRow < chunkRows; chunkRow++) {
+        for (int chunkCol = 0; chunkCol < chunkColumns; chunkCol++) {
+            const Chunk& chunk = chunkedImage.getChunk(chunkRow, chunkCol);
+            
+            // Calculate the starting position in the original image
+            int startRow = chunkRow * chunkSize;
+            int startCol = chunkCol * chunkSize;
+            
+            // Copy pixels from this chunk
+            for (int localRow = 0; localRow < chunkSize; localRow++) {
+                for (int localCol = 0; localCol < chunkSize; localCol++) {
+                    int globalRow = startRow + localRow;
+                    int globalCol = startCol + localCol;
+                    
+                    // Only copy if within original image bounds
+                    if (globalRow < rows && globalCol < columns) {
+                        // Copy all three channels
+                        for (int channel = 0; channel < 3; channel++) {
+                            pixels[globalRow][globalCol][channel] = chunk[channel][localRow][localCol];
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 // Abstract base class for image transforms
 class Transform {

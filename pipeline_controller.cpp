@@ -23,6 +23,11 @@ int main() {
         std::cout << std::endl;
     }
     
+    // Calculate entropy of original image
+    std::cout << "\nCalculating entropy of original image..." << std::endl;
+    double originalEntropy = img.getEntropy();
+    std::cout << "Original image entropy: " << originalEntropy << " bits per pixel" << std::endl;
+    
     // Create ChunkedImage from the original image
     std::cout << "\nCreating ChunkedImage..." << std::endl;
     ChunkedImage chunkedImg(img, 8);
@@ -42,6 +47,12 @@ int main() {
     std::cout << "Encoded result info:" << std::endl;
     encodedResult.printInfo();
     
+    // Calculate entropy of encoded image
+    std::cout << "\nCalculating entropy of encoded image..." << std::endl;
+    Image encodedImg(encodedResult);
+    double encodedEntropy = encodedImg.getEntropy();
+    std::cout << "Encoded image entropy: " << encodedEntropy << " bits per pixel" << std::endl;
+    
     // Print some encoded values (first chunk, R channel)
     std::cout << "\nEncoded DCT values (first chunk, R channel):" << std::endl;
     const Chunk& firstChunk = encodedResult.getChunkAt(0);
@@ -58,6 +69,12 @@ int main() {
     std::cout << "Inverse DCT transform applied successfully!" << std::endl;
     std::cout << "Decoded result info:" << std::endl;
     decodedResult.printInfo();
+    
+    // Calculate entropy of decoded image
+    std::cout << "\nCalculating entropy of decoded image..." << std::endl;
+    Image decodedImg(decodedResult);
+    double decodedEntropy = decodedImg.getEntropy();
+    std::cout << "Decoded image entropy: " << decodedEntropy << " bits per pixel" << std::endl;
     
     // Print some decoded values (first chunk, R channel)
     std::cout << "\nDecoded image values (first chunk, R channel):" << std::endl;
@@ -81,6 +98,15 @@ int main() {
         }
         std::cout << std::endl;
     }
+    
+    // Entropy summary
+    std::cout << "\n=== ENTROPY SUMMARY ===" << std::endl;
+    std::cout << "Original image entropy:  " << originalEntropy << " bits per pixel" << std::endl;
+    std::cout << "Encoded image entropy:   " << encodedEntropy << " bits per pixel" << std::endl;
+    std::cout << "Decoded image entropy:   " << decodedEntropy << " bits per pixel" << std::endl;
+    std::cout << "Entropy change (orig->enc): " << (encodedEntropy - originalEntropy) << " bits per pixel" << std::endl;
+    std::cout << "Entropy change (enc->dec):  " << (decodedEntropy - encodedEntropy) << " bits per pixel" << std::endl;
+    std::cout << "Entropy change (orig->dec): " << (decodedEntropy - originalEntropy) << " bits per pixel" << std::endl;
     
     std::cout << "\nDCT Transform test completed successfully!" << std::endl;
     return 0;
