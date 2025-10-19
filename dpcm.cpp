@@ -1,6 +1,9 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include "dpcm.h"
+#include <vector>
+#include <string>
+#include "dpcm.hpp"
+#include "utils/image_lib.hpp"
 
 void printArray(int *arr, int size) {
 	
@@ -39,7 +42,7 @@ int dotProduct(int *arr1, int *arr2, int size) {
 
 int *createLinearArray(int size) {
 	
-	int *arr = malloc(sizeof(int)*size);
+	int *arr = (int *)malloc(sizeof(int)*size);
 	
 	for (int i = 0; i < size; i++) {
 		arr[i] = i+1;
@@ -59,7 +62,7 @@ int *zigzagFlattenArray(int **arr, int size) {
 	int dir = 1;
 	int sign = 1;
 	
-	int *flat = malloc(sizeof(int)*size*size);
+	int *flat = (int *)malloc(sizeof(int)*size*size);
 	
 	for (int rep = -7; rep < 8; rep++) {
 		ste = 7 - abs(rep);
@@ -102,9 +105,9 @@ int **unflattenArray(int *arr, int size) {
 	int dir = 1;
 	int sign = 1;
 	
-	int **chunk = malloc(sizeof(int *)*size);
+	int **chunk = (int **)malloc(sizeof(int *)*size);
 	for (int i = 0; i < 8; i++) {
-		chunk[i] = malloc(sizeof(int)*8);
+		chunk[i] = (int *)malloc(sizeof(int)*8);
 	}
 	
 	for (int rep = -7; rep < 8; rep++) {
@@ -168,74 +171,69 @@ int linearPredictor(int *y_arr, int size) {
 	return next_y;
 	
 }
-
-int *encoder(int **arr) {
-	int size = 8;
-	int prediction_size = 4;
-	
-	int *flattened_chunk = zigzagFlattenArray(arr, size);
-	printArray(flattened_chunk, size*size);
-	int *result = malloc(sizeof(int)*size*size);
-	int *sample = malloc(sizeof(int)*prediction_size);
-	
-	int i = 0;
-	
-	while (i < prediction_size) {
-		result[i] = flattened_chunk[i];
-		i++;
-	}
-	
-	while (i < size*size) {
-		for (int j = 0; j < prediction_size; j++) {
-			sample[j] = flattened_chunk[i - (prediction_size-j)];
+namespace dpcm {
+	int *encoder(int *arr, int size, int prediction_size) {
+		
+		int *result = (int *)malloc(sizeof(int)*size*size);
+		int *sample = (int *)malloc(sizeof(int)*prediction_size);
+		
+		int i = 0;
+		
+		while (i < prediction_size) {
+			result[i] = arr[i];
+			i++;
 		}
 		
-		result[i] = flattened_chunk[i] - linearPredictor(sample, prediction_size);
-		i++;
-	}
-	
-	free(sample);
-	free(flattened_chunk);
-	return result;
-}
-
-int **decoder(int *arr) {
-	int size = 8;
-	int prediction_size = 4;
-	
-	int *flattened_chunk = malloc(sizeof(int)*size*size);
-	int *sample = malloc(sizeof(int)*prediction_size);
-	
-	int i = 0;
-	
-	while (i < prediction_size) {
-		flattened_chunk[i] = arr[i];
-		i++;
-	}	
-	
-	while (i < size*size) {
-		for (int j = 0; j < prediction_size; j++) {
-			sample[j] = flattened_chunk[i - (prediction_size-j)];
+		while (i < size*size) {
+			for (int j = 0; j < prediction_size; j++) {
+				sample[j] = arr[i - (prediction_size-j)];
+			}
+			
+			result[i] = arr[i] - linearPredictor(sample, prediction_size);
+			i++;
 		}
 		
-		flattened_chunk[i] = arr[i] + linearPredictor(sample, prediction_size);
-		i++;
+		free(sample);
+		return result;
 	}
-	
-	int **result = unflattenArray(flattened_chunk, size);
-	
-	free(sample);
-	free(flattened_chunk);
-	return result;
-}
 
+	int **decoder(int *arr) {
+		int size = 8;
+		int prediction_size = 4;
+		
+		int *flattened_chunk = (int *)malloc(sizeof(int)*size*size);
+		int *sample = (int *)malloc(sizeof(int)*prediction_size);
+		
+		int i = 0;
+		
+		while (i < prediction_size) {
+			flattened_chunk[i] = arr[i];
+			i++;
+		}	
+		
+		while (i < size*size) {
+			for (int j = 0; j < prediction_size; j++) {
+				sample[j] = flattened_chunk[i - (prediction_size-j)];
+			}
+			
+			flattened_chunk[i] = arr[i] + linearPredictor(sample, prediction_size);
+			i++;
+		}
+		
+		int **result = unflattenArray(flattened_chunk, size);
+		
+		free(sample);
+		free(flattened_chunk);
+		return result;
+	}
+}
 void test_flatten() {
 	
 	printf("Testing flatten...\n");
 	
-	int **test = malloc(sizeof(int *)*8);
+	int **test = (int **)malloc(sizeof(int *)*8);
 	for (int i = 0; i < 8; i++) {
-		test[i] = malloc(sizeof(int)*8);
+		test[i] = (int *)malloc(sizeof(int)*8);
 		for (int j = 0; j < 8; j++) {
 			test[i][j] = (i+1)*(j+1);
 		}
@@ -268,7 +266,7 @@ void test_linear() {
 	
 	printf("Testing linear predictor...\n");
 	
-	int *test = malloc(sizeof(int)*4);
+	int *test = (int *)malloc(sizeof(int)*4);
 	for (int i = 0; i < 4; i ++) {
 		test[i] = (i+1)*12;
 	}
@@ -283,21 +281,21 @@ void test_encoder() {
 	
 	printf("Testing encoder...\n");
 	
-	int **test = malloc(sizeof(int *)*8);
+	int **test = (int **)malloc(sizeof(int *)*8);
 	for (int i = 0; i < 8; i++) {
-		test[i] = malloc(sizeof(int)*8);
+		test[i] = (int *)malloc(sizeof(int)*8);
 		for (int j = 0; j < 8; j++) {
 			test[i][j] = (i+1)*(j+1);
 		}
 		printArray(test[i], 8);
 	}
 	
-	int *encoded = encoder(test);
+	int *encoded = dpcm::encoder(test);
 	printArray(encoded, 64);
 	
 	printf("Testing decoder...\n");
 	
-	int **decoded = decoder(encoded);
+	int **decoded = dpcm::decoder(encoded);
 	
 	free(encoded);
 	
@@ -324,7 +322,7 @@ int main(int argc, char **argv) {
 	
 	// test_flatten();
 	// test_linear();
-	test_encoder();
+	// test_encoder();
 	
 	return 0;
 	
