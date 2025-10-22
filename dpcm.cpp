@@ -95,6 +95,49 @@ int *zigzagFlattenArray(int **arr, int size) {
 	return flat;
 }
 
+int *zigzagFlattenArray(const std::vector<int> *arr, int size) {
+	
+	int i = 0;
+	int j = 0;
+	int k = 0; // flat
+	int val;
+	int ste;
+	int dir = 1;
+	int sign = 1;
+	
+	int *flat = (int *)malloc(sizeof(int)*size*size);
+	
+	for (int rep = -7; rep < 8; rep++) {
+		ste = 7 - abs(rep);
+		
+		while (ste >= 0) {
+			flat[k] = arr[i][j];
+			
+			i += dir;
+			j -= dir;
+			k++;
+			ste--;
+		}
+		
+		i -= dir;
+		j += dir;
+		
+		if (rep == 0) {
+			sign = -1;
+		}
+		
+		if (dir*sign > 0) {
+			i += 1;
+		} else {
+			j += 1;
+		}
+		
+		dir *= -1;
+	}
+	
+	return flat;
+}
+
 int **unflattenArray(int *arr, int size) {
 	
 	int i = 0;
@@ -226,6 +269,7 @@ namespace dpcm {
 		free(flattened_chunk);
 		return result;
 	}
+	
 }
 void test_flatten() {
 	
@@ -262,68 +306,68 @@ void test_flatten() {
 	
 }
 
-void test_linear() {
+// void test_linear() {
 	
-	printf("Testing linear predictor...\n");
+	// printf("Testing linear predictor...\n");
 	
-	int *test = (int *)malloc(sizeof(int)*4);
-	for (int i = 0; i < 4; i ++) {
-		test[i] = (i+1)*12;
-	}
+	// int *test = (int *)malloc(sizeof(int)*4);
+	// for (int i = 0; i < 4; i ++) {
+		// test[i] = (i+1)*12;
+	// }
 	
-	printArray(test, 4);
+	// printArray(test, 4);
 	
-	int next = linearPredictor(test, 4);
-	printf("next = %d\n", next);
-}
+	// int next = linearPredictor(test, 4);
+	// printf("next = %d\n", next);
+// }
 
-void test_encoder() {
+// void test_encoder() {
 	
-	printf("Testing encoder...\n");
+	// printf("Testing encoder...\n");
 	
-	int **test = (int **)malloc(sizeof(int *)*8);
-	for (int i = 0; i < 8; i++) {
-		test[i] = (int *)malloc(sizeof(int)*8);
-		for (int j = 0; j < 8; j++) {
-			test[i][j] = (i+1)*(j+1);
-		}
-		printArray(test[i], 8);
-	}
+	// int **test = (int **)malloc(sizeof(int *)*8);
+	// for (int i = 0; i < 8; i++) {
+		// test[i] = (int *)malloc(sizeof(int)*8);
+		// for (int j = 0; j < 8; j++) {
+			// test[i][j] = (i+1)*(j+1);
+		// }
+		// printArray(test[i], 8);
+	// }
 	
-	int *encoded = dpcm::encoder(test);
-	printArray(encoded, 64);
+	// int *encoded = dpcm::encoder(test);
+	// printArray(encoded, 64);
 	
-	printf("Testing decoder...\n");
+	// printf("Testing decoder...\n");
 	
-	int **decoded = dpcm::decoder(encoded);
+	// int **decoded = dpcm::decoder(encoded);
 	
-	free(encoded);
+	// free(encoded);
 	
-	for (int i = 0; i < 8; i++) {
-		printArray(decoded[i], 8);
-		free(decoded[i]);
-	}
+	// for (int i = 0; i < 8; i++) {
+		// printArray(decoded[i], 8);
+		// free(decoded[i]);
+	// }
 	
-	free(decoded);
+	// free(decoded);
 	
-	for (int i = 0; i < 8; i++) {
-		free(test[i]);
-	}
-	free(test);
-}
+	// for (int i = 0; i < 8; i++) {
+		// free(test[i]);
+	// }
+	// free(test);
+// }
 
-int main(int argc, char **argv) {
+// int main(int argc, char **argv) {
 	
-    if (argc > 1)
-    {
-        printf("Usage message\n");
-        return 1;
-    }
+    // if (argc > 1)
+    // {
+        // printf("Usage message\n");
+        // return 1;
+    // }
 	
 	// test_flatten();
 	// test_linear();
 	// test_encoder();
 	
-	return 0;
+	// return 0;
 	
-}
+// }
