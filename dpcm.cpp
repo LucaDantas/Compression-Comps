@@ -240,9 +240,7 @@ namespace dpcm {
 		return result;
 	}
 
-	int **decoder(int *arr) {
-		int size = 8;
-		int prediction_size = 4;
+	int *decoder(int *arr, int size, int prediction_size) {
 		
 		int *flattened_chunk = (int *)malloc(sizeof(int)*size*size);
 		int *sample = (int *)malloc(sizeof(int)*prediction_size);
@@ -263,11 +261,8 @@ namespace dpcm {
 			i++;
 		}
 		
-		int **result = unflattenArray(flattened_chunk, size);
-		
 		free(sample);
-		free(flattened_chunk);
-		return result;
+		return flattened_chunk;
 	}
 	
 }
