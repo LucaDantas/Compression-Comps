@@ -7,11 +7,9 @@
 // by Jiale Wan Oct 2025
 // SP Transform for 2-D images
 
-#include <algorithm>
 #include <cassert>
-#include <cstdint>
 #include <vector>
-// #include "image_lib.hpp"  // Commented out for simple testing
+#include "image_lib.hpp" 
 
 namespace cscomps {
 namespace sp {
@@ -23,7 +21,7 @@ struct Params {
   //           - phi1 * d1[l+1]) >> coeff_shift
   int beta_m1 = 0;
   int beta_0 = 2;
-  int beta_p1 = 3;
+  int beta_p1 = 3;  
   int phi1 = 2;
 
   enum class Border { Clamp, Mirror };
@@ -40,7 +38,7 @@ struct Plane {
   int* data = nullptr;
   int width = 0;
   int height = 0;
-  int stride = 0;
+  int stride = 0;//may be not necessary right now
 };
 
 // Subband rectangle descriptors in-place (row-major).
@@ -116,7 +114,7 @@ class Transform {
   mutable std::vector<int> colBuf;
   mutable std::vector<int> tempRow; // reused in 1D
 
-  // --------- helpers ----------
+  //helpers 
   static inline int floor_div2(int x) {
     return (x >= 0) ? (x >> 1) : -(((-x) + 1) >> 1);
   }
@@ -257,16 +255,16 @@ class Transform {
       // gather
       for (int y = 0; y < h; ++y) colBuf[y] = base[y * stride + x];
       // 1-D forward
-      forward1D(colBuf.data(), h);
+        forward1D(colBuf.data(), h);
       // scatter
       for (int y = 0; y < h; ++y) base[y * stride + x] = colBuf[y];
     }
   }
-
+  // vice versa
   void inverseCols(int* base, int stride, int w, int h) const {
     for (int x = 0; x < w; ++x) {
       for (int y = 0; y < h; ++y) colBuf[y] = base[y * stride + x];
-      inverse1D(colBuf.data(), h);
+        inverse1D(colBuf.data(), h);
       for (int y = 0; y < h; ++y) base[y * stride + x] = colBuf[y];
     }
   }
@@ -274,5 +272,86 @@ class Transform {
 
 } // namespace sp
 } // namespace cscomps
+
+// SPTransform class that inherits from the Transform base class in image_lib.hpp
+// This allows S+P transform to work seamlessly in the image processing pipeline
+
+class SPTransform : public Transform {
+private:
+  cscomps::sp::Params params;
+  cscomps::sp::Transform spTransform;
+
+public:
+  // Constructor with optional S+P parameters
+  explicit SPTransform(cscomps::sp::Params p = cscomps::sp::Params::NaturalImage())
+      : Transform(TransformSpace::SP), params(p), spTransform(p) {}
+
+protected:
+  // Encode a chunk: apply forward S+P transform to each channel
+  void encodeChunk(const Chunk& inputChunk, Chunk& outputChunk) override {
+    const int chunkSize = inputChunk.getChunkSize();
+    
+    // Process each of the 3 channels independently
+    for (int ch = 0; ch < 3; ++ch) {
+      // Copy channel data to a flat int buffer for S+P transform
+      std::vector<int> channelData(chunkSize * chunkSize);
+      for (int y = 0; y < chunkSize; ++y) {
+        for (int x = 0; x < chunkSize; ++x) {
+          channelData[y * chunkSize + x] = inputChunk[ch][y][x];
+        }
+      }
+      
+      // Create a Plane structure for this channel
+      cscomps::sp::Plane plane;
+      plane.data = channelData.data();
+      plane.width = chunkSize;
+      plane.height = chunkSize;
+      plane.stride = chunkSize;
+      
+      // Apply forward S+P transform in-place
+      spTransform.forward2D(plane);
+      
+      // Copy transformed data back to output chunk
+      for (int y = 0; y < chunkSize; ++y) {
+        for (int x = 0; x < chunkSize; ++x) {
+          outputChunk[ch][y][x] = channelData[y * chunkSize + x];
+        }
+      }
+    }
+  }
+  
+  // Decode a chunk: apply inverse S+P transform to each channel
+  void decodeChunk(const Chunk& encodedChunk, Chunk& outputChunk) override {
+    const int chunkSize = encodedChunk.getChunkSize();
+    
+    // Process each of the 3 channels independently
+    for (int ch = 0; ch < 3; ++ch) {
+      // Copy channel data to a flat int buffer for S+P transform
+      std::vector<int> channelData(chunkSize * chunkSize);
+      for (int y = 0; y < chunkSize; ++y) {
+        for (int x = 0; x < chunkSize; ++x) {
+          channelData[y * chunkSize + x] = encodedChunk[ch][y][x];
+        }
+      }
+      
+      // Create a Plane structure for this channel
+      cscomps::sp::Plane plane;
+      plane.data = channelData.data();
+      plane.width = chunkSize;
+      plane.height = chunkSize;
+      plane.stride = chunkSize;
+      
+      // Apply inverse S+P transform in-place
+      spTransform.inverse2D(plane);
+      
+      // Copy reconstructed data back to output chunk
+      for (int y = 0; y < chunkSize; ++y) {
+        for (int x = 0; x < chunkSize; ++x) {
+          outputChunk[ch][y][x] = channelData[y * chunkSize + x];
+        }
+      }
+    }
+  }
+};
 
 #endif // CS_COMPS_SP_TRANSFORM_HPP
