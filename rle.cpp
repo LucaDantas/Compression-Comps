@@ -44,13 +44,19 @@ namespace rle {
 		int k = 0; // flat counter
 		while (j < size*size && arr[j] != NULL) {
 			curRun = arr[j];
-			for (int i = curRun[0]; i > 0; i--) {
-				flat[k] = 0;
+			if (curRun[0] > 15 && j == 0 && k == 0){
+				flat[k] = -1;
 				k++;
+				j++;
+			} else {
+				for (int i = curRun[0]; i > 0; i--) {
+					flat[k] = 0;
+					k++;
+				}
+				flat[k] = curRun[1];
+				k++;
+				j++;
 			}
-			flat[k] = curRun[1];
-			k++;
-			j++;
 		}
 		
 		return flat;
