@@ -17,7 +17,7 @@ void populateVector(int **arr, std::vector<int *>& targetVector, int size) { // 
 	
 }
 
-void populateChunk(int **arr, std::vector<int> *chunk) {
+void populateChunk(int **arr, std::vector<int> *chunk, int size) {
 	
 	for (int i = 0; i < size; i++) {
 		for (int j = 0; j < size; j++) {
@@ -83,16 +83,20 @@ int *EntropyEncode(const ChunkedImage& chunkedImage) {
 }
 
 
-void EntropyDecodeDCT(ChunkedImage chunkedImage, EntropyDecoded *encoded) {
+void EntropyDecodeDCT(ChunkedImage& chunkedImage, EntropyEncoded *encoded) {
 	int numChunks = chunkedImage.getTotalChunks();
 	int size = chunkedImage.getChunkSize();
+	int predictionSize = 4;
 	
 	int *coefficientsDC = NULL;
 	int *coefficientsAC = NULL;
 	int **coefficientsACByChunk = (int **)malloc(sizeof(int *)*size*size);
-	coefficientsACByChunk[0] = [16, 16];
-	
+	int first[2] = {16, 16};
+	coefficientsACByChunk[0] = first;
 	int **tempArray = NULL;
+	int j = 0;
+	int k = 0;
+	int curRleSum = 0;
 
 	std::vector<int *> DCComponent = (*encoded).DCComponent;
 	std::vector<std::vector<int *>> ACComponent = (*encoded).ACComponent;
@@ -102,35 +106,44 @@ void EntropyDecodeDCT(ChunkedImage chunkedImage, EntropyDecoded *encoded) {
 	for (int channel = 0; channel < 3; channel++) {
 
 		coefficientsDC = dpcm::decoder(DCComponent[channel], size, predictionSize);
+		k = 0;
 		
 		for (int i = 0; i < numChunks; i++) {
 			chunkedImage.getChunkAt(i)[channel][0][0] = coefficientsDC[i];
 		}
 		
 		free(coefficientsDC);
-		
+				
 		for (int i = 0; i < numChunks; i++) {
 			curChunk = chunkedImage.getChunkAt(i)[channel].data();
 			
-			for (int j = 0; j < size*size-1; j++) {
-				coefficientsACByChunk[j+1] = ACComponent[channel][i*63 + j];
+			j = 0;
+			curRleSum = 0;
+			
+			while (curRleSum < size*size-1 && j < size*size-1) {
+				coefficientsACByChunk[j+1] = ACComponent[channel][k];
+				curRleSum += ACComponent[channel][k][0] + 1;
+				k++;
+				j++;
 			}
 			
 			coefficientsAC = rle::decoder(coefficientsACByChunk, size);
 			tempArray = unflattenArray(coefficientsAC, size);
 			
-			populateChunk(tempArray, curChunk);
+			populateChunk(tempArray, curChunk, size);
+
 			
 			for (int i = 0; i < size; i++) {
 				free(tempArray[i]);
 			}
+
 			free(tempArray);
 			free(coefficientsAC);
 		}
 	}
 }
 
-void EntropyDecode(ChunkedImage chunkedImage, EntropyEncoded *encoded) {
+void EntropyDecode(ChunkedImage& chunkedImage, EntropyEncoded *encoded) {
 	
 	if (chunkedImage.transformSpace == DCT) {
 		EntropyDecodeDCT(ChunkedImage chunkedImage, EntropyDecoded *encoded);
