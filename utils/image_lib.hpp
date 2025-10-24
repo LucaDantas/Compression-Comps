@@ -21,6 +21,7 @@ enum class TransformSpace {
     Raw,        // Raw image data
     DCT,        // Discrete Cosine Transform
     DWT,        // Discrete Wavelet Transform
+    Haar,       // Haar Wavelet Transform
     SP          // S+P Transform
 };
 
@@ -239,11 +240,14 @@ public:
         }
         
         // Check if the image is in Raw transform space
+        // COMMENTED OUT FOR NOW - allow saving any transform space
+        /*
         if (transformSpace != TransformSpace::Raw) {
             std::cerr << "Error: Image must be in Raw transform space to save as PNG. Current transform space: " 
                       << transformSpaceToString(transformSpace) << std::endl;
             return false;
         }
+        */
         
         // Convert pixel data to flat RGB array for STB with clamping
         std::vector<unsigned char> rgbData(rows * columns * 3);
@@ -279,11 +283,14 @@ public:
         }
         
         // Check if the image is in Raw transform space
+        // COMMENTED OUT FOR NOW - allow saving any transform space
+        /*
         if (transformSpace != TransformSpace::Raw) {
             std::cerr << "Error: Image must be in Raw transform space to save channel as BW. Current transform space: " 
                       << transformSpaceToString(transformSpace) << std::endl;
             return false;
         }
+        */
         
         // Validate channel index
         if (channel < 0 || channel >= 3) {
@@ -344,9 +351,12 @@ Image imageDiff(const Image& img1, const Image& img2, int scale = 100) {
     }
     
     // Check if both images are in Raw transform space
+    // COMMENTED OUT FOR NOW - allow difference computation for any transform space
+    /*
     if (img1.getTransformSpace() != TransformSpace::Raw || img2.getTransformSpace() != TransformSpace::Raw) {
         throw std::runtime_error("Both images must be in Raw transform space for difference computation");
     }
+    */
     
     // Create result image with same dimensions and properties as input images
     Image result = img1; // Copy constructor to get same dimensions and properties

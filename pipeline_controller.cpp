@@ -8,53 +8,34 @@
 #include "utils/image_lib.hpp"
 #include "utils/dct_transform.hpp"
 #include "utils/sp_transform.hpp"
+// #include "DWT/haar_transform.hpp"  // Uncomment when Haar transform is fixed
 
+// Forward declarations
+struct ProgramArgs {
+    int chunkSize;
+    std::string imagePath;
+    std::string transformType;
+};
 
-// for now this is a simple test of the DCT transform
+// Function declarations
+ProgramArgs parseCommandLineArgs(int argc, char* argv[]);
+void printUsage(const char* programName);
+double loadAndDisplayImageInfo(const std::string& imagePath, int chunkSize);
+ChunkedImage createChunkedImage(const Image& img, int chunkSize);
+Transform* createTransform(const std::string& transformType);
+ChunkedImage applyTransform(Transform* transform, const ChunkedImage& chunkedImg, const std::string& transformType);
+void analyzeEncodedImage(const ChunkedImage& encodedResult, const Image& encodedImg, int chunkSize);
+void createEncodedVisualization(const Image& encodedImg, const std::string& saveDir);
+ChunkedImage applyInverseTransform(Transform* transform, const ChunkedImage& encodedResult, const std::string& transformType);
+void saveDecodedImage(const Image& decodedImg, const std::string& saveDir);
+void computeAndAnalyzeDifference(const Image& originalImg, const Image& decodedImg, const std::string& saveDir, int chunkSize);
+void printEntropySummary(double originalEntropy, double encodedEntropy, double decodedEntropy, const std::string& transformType);
 
 int main(int argc, char* argv[]) {
     // Parse command line arguments
-    if (argc < 2 || argc > 4) {
-        std::cerr << "Usage: " << argv[0] << " <chunk_size> [--transform DCT|SP]" << std::endl;
-        std::cerr << "Example: " << argv[0] << " 8" << std::endl;
-        std::cerr << "Example: " << argv[0] << " 8 --transform SP" << std::endl;
-        std::cerr << "Transform options: DCT (default), SP" << std::endl;
-        return 1;
-    }
-    
-    int chunkSize;
-    try {
-        chunkSize = std::stoi(argv[1]);
-        if (chunkSize <= 0) {
-            throw std::invalid_argument("Chunk size must be positive");
-        }
-    } catch (const std::exception& e) {
-        std::cerr << "Error: Invalid chunk size. " << e.what() << std::endl;
-        return 1;
-    }
-    
-    // Parse transform option
-    std::string transformType = "DCT"; // Default
-    for (int i = 2; i < argc; i++) {
-        std::string arg = argv[i];
-        if (arg == "--transform" && i + 1 < argc) {
-            std::string transformArg = argv[i + 1];
-            // Convert to uppercase for case-insensitive comparison
-            std::transform(transformArg.begin(), transformArg.end(), transformArg.begin(), ::toupper);
-            if (transformArg == "DCT" || transformArg == "SP") {
-                transformType = transformArg;
-                i++; // Skip the next argument since we consumed it
-            } else {
-                std::cerr << "Error: Invalid transform type '" << argv[i + 1] << "'. Must be DCT or SP." << std::endl;
-                return 1;
-            }
-        } else if (arg == "--transform") {
-            std::cerr << "Error: --transform requires a value (DCT or SP)" << std::endl;
-            return 1;
-        } else {
-            std::cerr << "Error: Unknown argument '" << arg << "'" << std::endl;
-            return 1;
-        }
+    ProgramArgs args = parseCommandLineArgs(argc, argv);
+    if (args.chunkSize == -1) {
+        return 1; // Error already printed
     }
     
     // Create savedImages directory if it doesn't exist
@@ -67,21 +48,175 @@ int main(int argc, char* argv[]) {
         }
     }
     
-    std::cout << "Starting " << transformType << " Transform test with chunk size: " << chunkSize << std::endl;
+    std::cout << "Starting " << args.transformType << " Transform test with chunk size: " << args.chunkSize << std::endl;
     
-    // Load image from file
-    std::cout << "Loading image..." << std::endl;
-    Image img("Datasets/KodakImages/1.png");
+    // Load image and display basic info
+    Image img(args.imagePath);
+    double originalEntropy = loadAndDisplayImageInfo(args.imagePath, args.chunkSize);
+    
+    // Create ChunkedImage
+    ChunkedImage chunkedImg = createChunkedImage(img, args.chunkSize);
+    
+    // Create and apply transform
+    Transform* transform = createTransform(args.transformType);
+    ChunkedImage encodedResult = applyTransform(transform, chunkedImg, args.transformType);
+    
+    // Calculate entropy of encoded image
+    Image encodedImg(encodedResult);
+    double encodedEntropy = encodedImg.getEntropy();
+    std::cout << "Encoded image entropy: " << encodedEntropy << " bits per pixel" << std::endl;
+    
+    // Analyze encoded image
+    analyzeEncodedImage(encodedResult, encodedImg, args.chunkSize);
+    
+    // Create visualization
+    createEncodedVisualization(encodedImg, saveDir);
+    
+    // Apply inverse transform
+    ChunkedImage decodedResult = applyInverseTransform(transform, encodedResult, args.transformType);
+    
+    // Calculate entropy of decoded image
+    Image decodedImg(decodedResult);
+    double decodedEntropy = decodedImg.getEntropy();
+    std::cout << "Decoded image entropy: " << decodedEntropy << " bits per pixel" << std::endl;
+    
+    // Save decoded image
+    saveDecodedImage(decodedImg, saveDir);
+    
+    // Compute and analyze difference
+    computeAndAnalyzeDifference(img, decodedImg, saveDir, args.chunkSize);
+    
+    // Print entropy summary
+    printEntropySummary(originalEntropy, encodedEntropy, decodedEntropy, args.transformType);
+    
+    std::cout << "\n" << args.transformType << " Transform test completed successfully!" << std::endl;
+    
+    // Clean up transform object
+    delete transform;
+    
+    return 0;
+}
+
+// Function implementations
+
+ProgramArgs parseCommandLineArgs(int argc, char* argv[]) {
+    ProgramArgs args;
+    args.chunkSize = -1;
+    args.imagePath = "";
+    args.transformType = "DCT"; // Default
+    
+    if (argc < 3 || argc > 7) {
+        printUsage(argv[0]);
+        return args; // Return with error state
+    }
+    
+    // Parse arguments
+    for (int i = 1; i < argc; i++) {
+        std::string arg = argv[i];
+        
+        if (arg == "--chunksize" && i + 1 < argc) {
+            try {
+                args.chunkSize = std::stoi(argv[i + 1]);
+                if (args.chunkSize <= 0) {
+                    throw std::invalid_argument("Chunk size must be positive");
+                }
+                i++; // Skip the next argument since we consumed it
+            } catch (const std::exception& e) {
+                std::cerr << "Error: Invalid chunk size. " << e.what() << std::endl;
+                args.chunkSize = -1; // Set error state
+                return args;
+            }
+        } else if (arg == "--path" && i + 1 < argc) {
+            args.imagePath = argv[i + 1];
+            i++; // Skip the next argument since we consumed it
+        } else if (arg == "--transform" && i + 1 < argc) {
+            std::string transformArg = argv[i + 1];
+            // Convert to uppercase for case-insensitive comparison
+            std::transform(transformArg.begin(), transformArg.end(), transformArg.begin(), ::toupper);
+            if (transformArg == "DCT" || transformArg == "SP" || transformArg == "HAAR") {
+                args.transformType = transformArg;
+                i++; // Skip the next argument since we consumed it
+            } else {
+                std::cerr << "Error: Invalid transform type '" << argv[i + 1] << "'. Must be DCT, SP, or HAAR." << std::endl;
+                args.chunkSize = -1; // Set error state
+                return args;
+            }
+        } else if (arg == "--chunksize") {
+            std::cerr << "Error: --chunksize requires a value" << std::endl;
+            args.chunkSize = -1; // Set error state
+            return args;
+        } else if (arg == "--path") {
+            std::cerr << "Error: --path requires a value" << std::endl;
+            args.chunkSize = -1; // Set error state
+            return args;
+        } else if (arg == "--transform") {
+            std::cerr << "Error: --transform requires a value (DCT, SP, or HAAR)" << std::endl;
+            args.chunkSize = -1; // Set error state
+            return args;
+        } else {
+            std::cerr << "Error: Unknown argument '" << arg << "'" << std::endl;
+            args.chunkSize = -1; // Set error state
+            return args;
+        }
+    }
+    
+    // Validate required arguments
+    if (args.chunkSize == -1) {
+        std::cerr << "Error: --chunksize is required" << std::endl;
+        return args;
+    }
+    
+    if (args.imagePath.empty()) {
+        std::cerr << "Error: --path is required" << std::endl;
+        args.chunkSize = -1; // Set error state
+        return args;
+    }
+    
+    // Check if image file exists
+    if (!std::filesystem::exists(args.imagePath)) {
+        std::cerr << "Error: Image file '" << args.imagePath << "' does not exist" << std::endl;
+        args.chunkSize = -1; // Set error state
+        return args;
+    }
+    
+    return args;
+}
+
+void printUsage(const char* programName) {
+    std::cerr << "Usage: " << programName << " --chunksize <size> --path <image_path> [--transform DCT|SP|HAAR]" << std::endl;
+    std::cerr << "Example: " << programName << " --chunksize 8 --path Datasets/KodakImages/1.png" << std::endl;
+    std::cerr << "Example: " << programName << " --chunksize 8 --path Datasets/KodakImages/1.png --transform SP" << std::endl;
+    std::cerr << "Example: " << programName << " --chunksize 8 --path Datasets/KodakImages/1.png --transform HAAR" << std::endl;
+    std::cerr << "Required arguments:" << std::endl;
+    std::cerr << "  --chunksize <size>     : Size of chunks (must be positive)" << std::endl;
+    std::cerr << "  --path <image_path>    : Path to input image" << std::endl;
+    std::cerr << "Optional arguments:" << std::endl;
+    std::cerr << "  --transform <type>     : Transform type (DCT, SP, HAAR). Default: DCT" << std::endl;
+}
+
+double loadAndDisplayImageInfo(const std::string& imagePath, int chunkSize) {
+    std::cout << "Loading image from: " << imagePath << std::endl;
+    Image img(imagePath);
     std::cout << "Image loaded successfully!" << std::endl;
     img.printInfo();
     
     // Print some original pixel values (first chunk block)
-    std::cout << "\nOriginal image values (first " << chunkSize << "x" << chunkSize << " block, R channel):" << std::endl;
-    for (int i = 0; i < chunkSize && i < img.getRows(); i++) {
-        for (int j = 0; j < chunkSize && j < img.getColumns(); j++) {
-            std::cout << img.getPixel(i, j)[0] << "\t";
+    if (chunkSize <= 16) {
+        std::cout << "\nOriginal image values (first " << chunkSize << "x" << chunkSize << " block, R channel):" << std::endl;
+        for (int i = 0; i < chunkSize && i < img.getRows(); i++) {
+            for (int j = 0; j < chunkSize && j < img.getColumns(); j++) {
+                std::cout << img.getPixel(i, j)[0] << "\t";
+            }
+            std::cout << std::endl;
         }
-        std::cout << std::endl;
+    } else {
+        std::cout << "\nOriginal image values (first 8x8 block, R channel) - chunk too large to display fully:" << std::endl;
+        for (int i = 0; i < 8 && i < img.getRows(); i++) {
+            for (int j = 0; j < 8 && j < img.getColumns(); j++) {
+                std::cout << img.getPixel(i, j)[0] << "\t";
+            }
+            std::cout << std::endl;
+        }
     }
     
     // Calculate entropy of original image
@@ -89,13 +224,18 @@ int main(int argc, char* argv[]) {
     double originalEntropy = img.getEntropy();
     std::cout << "Original image entropy: " << originalEntropy << " bits per pixel" << std::endl;
     
-    // Create ChunkedImage from the original image
+    return originalEntropy;
+}
+
+ChunkedImage createChunkedImage(const Image& img, int chunkSize) {
     std::cout << "\nCreating ChunkedImage..." << std::endl;
     ChunkedImage chunkedImg(img, chunkSize);
     std::cout << "ChunkedImage created successfully!" << std::endl;
     chunkedImg.printInfo();
-    
-    // Create Transform based on selection
+    return chunkedImg;
+}
+
+Transform* createTransform(const std::string& transformType) {
     std::cout << "\nCreating " << transformType << " Transform..." << std::endl;
     Transform* transform = nullptr;
     
@@ -103,50 +243,319 @@ int main(int argc, char* argv[]) {
         transform = new DCTTransform();
     } else if (transformType == "SP") {
         transform = new SPTransform();
+    } else if (transformType == "HAAR") {
+        // transform = new HaarTransform();
+        std::cout << "Haar transform not implemented yet" << std::endl;
+        exit(1);
     } else {
         std::cerr << "Error: Unknown transform type: " << transformType << std::endl;
-        return 1;
+        return nullptr;
     }
     
     std::cout << transformType << " Transform created successfully!" << std::endl;
     std::cout << "Transform space: " << transformSpaceToString(transform->getTransformSpace()) << std::endl;
     
-    // Apply transform (encoding)
+    return transform;
+}
+
+ChunkedImage applyTransform(Transform* transform, const ChunkedImage& chunkedImg, const std::string& transformType) {
     std::cout << "\nApplying " << transformType << " transform (encoding)..." << std::endl;
     ChunkedImage encodedResult = transform->applyTransform(chunkedImg);
     std::cout << transformType << " transform applied successfully!" << std::endl;
     std::cout << "Encoded result info:" << std::endl;
     encodedResult.printInfo();
+    return encodedResult;
+}
+
+void analyzeEncodedImage(const ChunkedImage& encodedResult, const Image& encodedImg, int chunkSize) {
+    std::cout << "\n=== ENCODED IMAGE ANALYTICS ===" << std::endl;
     
-    // Calculate entropy of encoded image
-    std::cout << "\nCalculating entropy of encoded image..." << std::endl;
-    Image encodedImg(encodedResult);
-    double encodedEntropy = encodedImg.getEntropy();
-    std::cout << "Encoded image entropy: " << encodedEntropy << " bits per pixel" << std::endl;
-    
-    // Print some encoded values (first chunk, R channel)
-    std::cout << "\nEncoded " << transformType << " values (first chunk, R channel):" << std::endl;
-    const Chunk& firstChunk = encodedResult.getChunkAt(0);
-    for (int i = 0; i < chunkSize; i++) {
-        for (int j = 0; j < chunkSize; j++) {
-            std::cout << firstChunk[0][i][j] << "\t";
-        }
-        std::cout << std::endl;
+    // Collect all pixel values for each channel
+    std::vector<std::vector<int>> channelValues(3);
+    for (int ch = 0; ch < 3; ch++) {
+        channelValues[ch].reserve(encodedImg.getRows() * encodedImg.getColumns());
     }
     
-    // Apply inverse transform (decoding)
+    for (int row = 0; row < encodedImg.getRows(); row++) {
+        for (int col = 0; col < encodedImg.getColumns(); col++) {
+            const Pixel& pixel = encodedImg.getPixel(row, col);
+            for (int ch = 0; ch < 3; ch++) {
+                channelValues[ch].push_back(pixel[ch]);
+            }
+        }
+    }
+    
+    // Calculate statistics for each channel
+    const char* channelNames[] = {"Red", "Green", "Blue"};
+    for (int ch = 0; ch < 3; ch++) {
+        std::vector<int>& values = channelValues[ch];
+        std::sort(values.begin(), values.end());
+        
+        int n = values.size();
+        std::cout << "\n" << channelNames[ch] << " Channel Statistics:" << std::endl;
+        std::cout << "  Total pixels: " << n << std::endl;
+        std::cout << "  Minimum: " << values[0] << std::endl;
+        std::cout << "  Maximum: " << values[n-1] << std::endl;
+        std::cout << "  Range: " << (values[n-1] - values[0]) << std::endl;
+        
+        // Percentiles
+        std::cout << "  Percentiles:" << std::endl;
+        std::cout << "    Top 1%:  " << values[static_cast<int>(n * 0.99)] << std::endl;
+        std::cout << "    Top 5%:  " << values[static_cast<int>(n * 0.95)] << std::endl;
+        std::cout << "    Top 10%: " << values[static_cast<int>(n * 0.90)] << std::endl;
+        std::cout << "    Top 25%: " << values[static_cast<int>(n * 0.75)] << std::endl;
+        std::cout << "    Median:   " << values[static_cast<int>(n * 0.50)] << std::endl;
+        std::cout << "    Bottom 25%: " << values[static_cast<int>(n * 0.25)] << std::endl;
+        std::cout << "    Bottom 10%: " << values[static_cast<int>(n * 0.10)] << std::endl;
+        std::cout << "    Bottom 5%:  " << values[static_cast<int>(n * 0.05)] << std::endl;
+        std::cout << "    Bottom 1%:  " << values[static_cast<int>(n * 0.01)] << std::endl;
+        
+        // Calculate mean and standard deviation
+        double sum = 0.0;
+        for (int val : values) {
+            sum += val;
+        }
+        double mean = sum / n;
+        
+        double variance = 0.0;
+        for (int val : values) {
+            variance += (val - mean) * (val - mean);
+        }
+        double stdDev = std::sqrt(variance / n);
+        
+        std::cout << "  Mean: " << mean << std::endl;
+        std::cout << "  Std Dev: " << stdDev << std::endl;
+        
+        // Count values near zero (important for compression)
+        int nearZeroCount = 0;
+        int zeroCount = 0;
+        for (int val : values) {
+            if (val == 0) zeroCount++;
+            if (std::abs(val) <= 1) nearZeroCount++;
+        }
+        
+        std::cout << "  Zero values: " << zeroCount << " (" << (100.0 * zeroCount / n) << "%)" << std::endl;
+        std::cout << "  Near zero (±1): " << nearZeroCount << " (" << (100.0 * nearZeroCount / n) << "%)" << std::endl;
+        
+        // Energy concentration analysis
+        long long totalEnergy = 0;
+        long long top10Energy = 0;
+        int top10Count = static_cast<int>(n * 0.10);
+        
+        for (int i = 0; i < n; i++) {
+            long long energy = static_cast<long long>(values[i]) * values[i];
+            totalEnergy += energy;
+            if (i >= n - top10Count) {
+                top10Energy += energy;
+            }
+        }
+        
+        double energyConcentration = (totalEnergy > 0) ? (100.0 * top10Energy / totalEnergy) : 0.0;
+        std::cout << "  Energy in top 10%: " << energyConcentration << "%" << std::endl;
+    }
+    
+    // Cross-channel analysis
+    std::cout << "\nCross-Channel Analysis:" << std::endl;
+    
+    // Calculate correlation between channels
+    double correlations[3][3];
+    for (int ch1 = 0; ch1 < 3; ch1++) {
+        for (int ch2 = 0; ch2 < 3; ch2++) {
+            if (ch1 == ch2) {
+                correlations[ch1][ch2] = 1.0;
+            } else {
+                // Calculate Pearson correlation
+                double sum1 = 0, sum2 = 0, sum1sq = 0, sum2sq = 0, sum12 = 0;
+                int n = channelValues[ch1].size();
+                
+                for (int i = 0; i < n; i++) {
+                    double val1 = channelValues[ch1][i];
+                    double val2 = channelValues[ch2][i];
+                    sum1 += val1;
+                    sum2 += val2;
+                    sum1sq += val1 * val1;
+                    sum2sq += val2 * val2;
+                    sum12 += val1 * val2;
+                }
+                
+                double numerator = n * sum12 - sum1 * sum2;
+                double denominator = std::sqrt((n * sum1sq - sum1 * sum1) * (n * sum2sq - sum2 * sum2));
+                correlations[ch1][ch2] = (denominator != 0) ? (numerator / denominator) : 0.0;
+            }
+        }
+    }
+    
+    std::cout << "  Channel Correlations:" << std::endl;
+    std::cout << "    R-G: " << correlations[0][1] << std::endl;
+    std::cout << "    R-B: " << correlations[0][2] << std::endl;
+    std::cout << "    G-B: " << correlations[1][2] << std::endl;
+    
+    // Transform-specific analysis
+    std::cout << "\nTransform-Specific Analysis:" << std::endl;
+    
+    // Analyze first chunk in detail
+    const Chunk& firstChunk = encodedResult.getChunkAt(0);
+    std::cout << "  First chunk (" << chunkSize << "x" << chunkSize << ") analysis:" << std::endl;
+    
+    for (int ch = 0; ch < 3; ch++) {
+        std::vector<int> chunkValues;
+        chunkValues.reserve(chunkSize * chunkSize);
+        
+        for (int i = 0; i < chunkSize; i++) {
+            for (int j = 0; j < chunkSize; j++) {
+                chunkValues.push_back(firstChunk[ch][i][j]);
+            }
+        }
+        
+        std::sort(chunkValues.begin(), chunkValues.end());
+        int chunkN = chunkValues.size();
+        
+        std::cout << "    " << channelNames[ch] << " channel:" << std::endl;
+        std::cout << "      Range: [" << chunkValues[0] << ", " << chunkValues[chunkN-1] << "]" << std::endl;
+        std::cout << "      DC component: " << firstChunk[ch][0][0] << std::endl;
+        
+        // Count non-zero coefficients
+        int nonZeroCount = 0;
+        for (int val : chunkValues) {
+            if (val != 0) nonZeroCount++;
+        }
+        std::cout << "      Non-zero coefficients: " << nonZeroCount << "/" << chunkN 
+                  << " (" << (100.0 * nonZeroCount / chunkN) << "%)" << std::endl;
+    }
+    
+    // Compression potential analysis
+    std::cout << "\nCompression Potential Analysis:" << std::endl;
+    
+    // Count coefficients by magnitude ranges
+    int ranges[5] = {0}; // 0, 1-10, 11-50, 51-100, >100
+    const char* rangeNames[] = {"0", "1-10", "11-50", "51-100", ">100"};
+    
+    for (int ch = 0; ch < 3; ch++) {
+        for (int val : channelValues[ch]) {
+            int absVal = std::abs(val);
+            if (absVal == 0) ranges[0]++;
+            else if (absVal <= 10) ranges[1]++;
+            else if (absVal <= 50) ranges[2]++;
+            else if (absVal <= 100) ranges[3]++;
+            else ranges[4]++;
+        }
+    }
+    
+    int totalCoeffs = channelValues[0].size() * 3;
+    std::cout << "  Coefficient magnitude distribution:" << std::endl;
+    for (int i = 0; i < 5; i++) {
+        std::cout << "    " << rangeNames[i] << ": " << ranges[i] 
+                  << " (" << (100.0 * ranges[i] / totalCoeffs) << "%)" << std::endl;
+    }
+    
+    // Theoretical compression ratio estimate
+    double compressionRatio = (double)totalCoeffs / (ranges[0] + ranges[1] + ranges[2]);
+    std::cout << "  Estimated compression ratio (if quantizing >50): " << compressionRatio << ":1" << std::endl;
+    
+    // Print some encoded values (first chunk, R channel)
+    if (chunkSize <= 16) {
+        std::cout << "\nEncoded values (first chunk, R channel):" << std::endl;
+        for (int i = 0; i < chunkSize; i++) {
+            for (int j = 0; j < chunkSize; j++) {
+                std::cout << firstChunk[0][i][j] << "\t";
+            }
+            std::cout << std::endl;
+        }
+    } else {
+        std::cout << "\nEncoded values (first 8x8 block, R channel) - chunk too large to display fully:" << std::endl;
+        for (int i = 0; i < 8; i++) {
+            for (int j = 0; j < 8; j++) {
+                std::cout << firstChunk[0][i][j] << "\t";
+            }
+            std::cout << std::endl;
+        }
+    }
+}
+
+void createEncodedVisualization(const Image& encodedImg, const std::string& saveDir) {
+    std::cout << "\nCreating encoded image visualization..." << std::endl;
+    
+    // Collect all pixel values for each channel to calculate percentiles
+    std::vector<std::vector<int>> channelValues(3);
+    for (int ch = 0; ch < 3; ch++) {
+        channelValues[ch].reserve(encodedImg.getRows() * encodedImg.getColumns());
+    }
+    
+    for (int row = 0; row < encodedImg.getRows(); row++) {
+        for (int col = 0; col < encodedImg.getColumns(); col++) {
+            const Pixel& pixel = encodedImg.getPixel(row, col);
+            for (int ch = 0; ch < 3; ch++) {
+                channelValues[ch].push_back(pixel[ch]);
+            }
+        }
+    }
+    
+    // Calculate 1% and 99% percentiles for scaling
+    int percentile1[3], percentile99[3];
+    const char* channelNames[] = {"Red", "Green", "Blue"};
+    for (int ch = 0; ch < 3; ch++) {
+        std::sort(channelValues[ch].begin(), channelValues[ch].end());
+        int n = channelValues[ch].size();
+        percentile1[ch] = channelValues[ch][static_cast<int>(n * 0.01)];
+        percentile99[ch] = channelValues[ch][static_cast<int>(n * 0.99)];
+    }
+    
+    // Create visualization image by copying the encoded image
+    Image encodedVisImg = encodedImg;
+    
+    for (int row = 0; row < encodedImg.getRows(); row++) {
+        for (int col = 0; col < encodedImg.getColumns(); col++) {
+            for (int ch = 0; ch < 3; ch++) {
+                int val = encodedImg.getPixel(row, col)[ch];
+                
+                // Scale to 0-255 range using 1%-99% percentiles
+                if (percentile99[ch] == percentile1[ch]) {
+                    // Avoid division by zero
+                    encodedVisImg.getPixel(row, col)[ch] = 128;
+                } else {
+                    // Clamp to percentile range first
+                    val = std::max(percentile1[ch], std::min(percentile99[ch], val));
+                    
+                    // Scale to 0-255
+                    double scaled = (double)(val - percentile1[ch]) / (percentile99[ch] - percentile1[ch]);
+                    encodedVisImg.getPixel(row, col)[ch] = static_cast<int>(scaled * 255);
+                }
+            }
+        }
+    }
+    
+    // Save visualization image
+    std::string encodedVisPath = saveDir + "/encodedVisualization.png";
+    if (encodedVisImg.saveAsPNG(encodedVisPath)) {
+        std::cout << "Encoded image visualization saved successfully as " << encodedVisPath << std::endl;
+        std::cout << "Scaling info:" << std::endl;
+        for (int ch = 0; ch < 3; ch++) {
+            std::cout << "  " << channelNames[ch] << " channel: [" << percentile1[ch] << ", " << percentile99[ch] << "] -> [0, 255]" << std::endl;
+        }
+    } else {
+        std::cout << "Failed to save encoded image visualization" << std::endl;
+    }
+    
+    // Save individual channel visualizations
+    std::cout << "Saving encoded image channel visualizations..." << std::endl;
+    std::string encodedVisBasePath = saveDir + "/encodedVisualization";
+    if (encodedVisImg.saveAllChannelsAsBW(encodedVisBasePath, 1)) {
+        std::cout << "Encoded image channel visualizations saved successfully as BW images in " << saveDir << std::endl;
+    } else {
+        std::cout << "Failed to save some encoded image channel visualizations" << std::endl;
+    }
+}
+
+ChunkedImage applyInverseTransform(Transform* transform, const ChunkedImage& encodedResult, const std::string& transformType) {
     std::cout << "\nApplying inverse " << transformType << " transform (decoding)..." << std::endl;
     ChunkedImage decodedResult = transform->applyInverseTransform(encodedResult);
     std::cout << "Inverse " << transformType << " transform applied successfully!" << std::endl;
     std::cout << "Decoded result info:" << std::endl;
     decodedResult.printInfo();
-    
-    // Calculate entropy of decoded image
-    std::cout << "\nCalculating entropy of decoded image..." << std::endl;
-    Image decodedImg(decodedResult);
-    double decodedEntropy = decodedImg.getEntropy();
-    std::cout << "Decoded image entropy: " << decodedEntropy << " bits per pixel" << std::endl;
-    
+    return decodedResult;
+}
+
+void saveDecodedImage(const Image& decodedImg, const std::string& saveDir) {
     // Save decoded image as PNG
     std::cout << "\nSaving decoded image as PNG..." << std::endl;
     std::string decodedPath = saveDir + "/decodedImage.png";
@@ -154,15 +563,6 @@ int main(int argc, char* argv[]) {
         std::cout << "Decoded image saved successfully as " << decodedPath << std::endl;
     } else {
         std::cout << "Failed to save decoded image as PNG" << std::endl;
-    }
-    
-    // Save original image channels as separate black and white images
-    std::cout << "Saving original image channels as separate BW images..." << std::endl;
-    std::string originalBasePath = saveDir + "/originalImage";
-    if (img.saveAllChannelsAsBW(originalBasePath, 1)) {
-        std::cout << "Original image channels saved successfully as BW images in " << saveDir << std::endl;
-    } else {
-        std::cout << "Failed to save some original image channels as BW images" << std::endl;
     }
     
     // Save decoded image channels as separate black and white images
@@ -173,34 +573,12 @@ int main(int argc, char* argv[]) {
     } else {
         std::cout << "Failed to save some decoded image channels as BW images" << std::endl;
     }
-    
-    // Print some decoded values (first chunk, R channel)
-    std::cout << "\nDecoded image values (first chunk, R channel):" << std::endl;
-    const Chunk& decodedChunk = decodedResult.getChunkAt(0);
-    for (int i = 0; i < chunkSize; i++) {
-        for (int j = 0; j < chunkSize; j++) {
-            std::cout << decodedChunk[0][i][j] << "\t";
-        }
-        std::cout << std::endl;
-    }
-    
-    // Compare original vs decoded (first chunk, R channel)
-    std::cout << "\nComparison - Original vs Decoded (first chunk, R channel):" << std::endl;
-    const Chunk& originalChunk = chunkedImg.getChunkAt(0);
-    for (int i = 0; i < chunkSize; i++) {
-        for (int j = 0; j < chunkSize; j++) {
-            int original = originalChunk[0][i][j];
-            int decoded = decodedChunk[0][i][j];
-            int diff = original - decoded;
-            std::cout << "(" << original << "," << decoded << "," << diff << ")\t";
-        }
-        std::cout << std::endl;
-    }
-    
-    // Compute difference image between original and decoded
+}
+
+void computeAndAnalyzeDifference(const Image& originalImg, const Image& decodedImg, const std::string& saveDir, int chunkSize) {
     std::cout << "\nComputing difference image between original and decoded..." << std::endl;
     try {
-        Image diffImg = imageDiff(img, decodedImg, 10);
+        Image diffImg = imageDiff(originalImg, decodedImg, 5);
         std::cout << "Difference image computed successfully!" << std::endl;
         
         // Save difference image as PNG
@@ -227,12 +605,22 @@ int main(int argc, char* argv[]) {
         std::cout << "Difference image entropy: " << diffEntropy << " bits per pixel" << std::endl;
         
         // Print some difference values (first chunk, R channel)
-        std::cout << "\nDifference image values (first " << chunkSize << "x" << chunkSize << " block, R channel):" << std::endl;
-        for (int i = 0; i < chunkSize && i < diffImg.getRows(); i++) {
-            for (int j = 0; j < chunkSize && j < diffImg.getColumns(); j++) {
-                std::cout << diffImg.getPixel(i, j)[0] << "\t";
+        if (chunkSize <= 16) {
+            std::cout << "\nDifference image values (first " << chunkSize << "x" << chunkSize << " block, R channel):" << std::endl;
+            for (int i = 0; i < chunkSize && i < diffImg.getRows(); i++) {
+                for (int j = 0; j < chunkSize && j < diffImg.getColumns(); j++) {
+                    std::cout << diffImg.getPixel(i, j)[0] << "\t";
+                }
+                std::cout << std::endl;
             }
-            std::cout << std::endl;
+        } else {
+            std::cout << "\nDifference image values (first 8x8 block, R channel) - chunk too large to display fully:" << std::endl;
+            for (int i = 0; i < 8 && i < diffImg.getRows(); i++) {
+                for (int j = 0; j < 8 && j < diffImg.getColumns(); j++) {
+                    std::cout << diffImg.getPixel(i, j)[0] << "\t";
+                }
+                std::cout << std::endl;
+            }
         }
         
         // Analyze pixel differences between original and decoded images
@@ -245,9 +633,9 @@ int main(int argc, char* argv[]) {
         int outOfBoundsCount = 0;
         
         // Analyze all pixels
-        for (int row = 0; row < img.getRows(); row++) {
-            for (int col = 0; col < img.getColumns(); col++) {
-                const Pixel& origPixel = img.getPixel(row, col);
+        for (int row = 0; row < originalImg.getRows(); row++) {
+            for (int col = 0; col < originalImg.getColumns(); col++) {
+                const Pixel& origPixel = originalImg.getPixel(row, col);
                 const Pixel& decodedPixel = decodedImg.getPixel(row, col);
                 
                 // Check each channel
@@ -311,11 +699,11 @@ int main(int argc, char* argv[]) {
         
         // Calculate average differences
         double totalDiff[3] = {0, 0, 0};
-        int totalPixels = img.getRows() * img.getColumns();
+        int totalPixels = originalImg.getRows() * originalImg.getColumns();
         
-        for (int row = 0; row < img.getRows(); row++) {
-            for (int col = 0; col < img.getColumns(); col++) {
-                const Pixel& origPixel = img.getPixel(row, col);
+        for (int row = 0; row < originalImg.getRows(); row++) {
+            for (int col = 0; col < originalImg.getColumns(); col++) {
+                const Pixel& origPixel = originalImg.getPixel(row, col);
                 const Pixel& decodedPixel = decodedImg.getPixel(row, col);
                 
                 for (int ch = 0; ch < 3; ch++) {
@@ -332,8 +720,9 @@ int main(int argc, char* argv[]) {
     } catch (const std::exception& e) {
         std::cerr << "Error computing difference image: " << e.what() << std::endl;
     }
-    
-    // Entropy summary
+}
+
+void printEntropySummary(double originalEntropy, double encodedEntropy, double decodedEntropy, const std::string& transformType) {
     std::cout << "\n=== ENTROPY SUMMARY ===" << std::endl;
     std::cout << "Original image entropy:  " << originalEntropy << " bits per pixel" << std::endl;
     std::cout << "Encoded image entropy:   " << encodedEntropy << " bits per pixel" << std::endl;
@@ -341,11 +730,4 @@ int main(int argc, char* argv[]) {
     std::cout << "Entropy change (orig->enc): " << (encodedEntropy - originalEntropy) << " bits per pixel" << std::endl;
     std::cout << "Entropy change (enc->dec):  " << (decodedEntropy - encodedEntropy) << " bits per pixel" << std::endl;
     std::cout << "Entropy change (orig->dec): " << (decodedEntropy - originalEntropy) << " bits per pixel" << std::endl;
-    
-    std::cout << "\n" << transformType << " Transform test completed successfully!" << std::endl;
-    
-    // Clean up transform object
-    delete transform;
-    
-    return 0;
 }
