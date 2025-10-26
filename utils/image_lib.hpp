@@ -578,6 +578,60 @@ protected:
     // These are protected so only derived classes can call them
     virtual void encodeChunk(const Chunk& inputChunk, Chunk& outputChunk) = 0;
     virtual void decodeChunk(const Chunk& encodedChunk, Chunk& outputChunk) = 0;
+	
+	virtual std::vector<std::vector<int>> getQuantizationMatrix() {
+		
+		std::vector<std::vector<int>> quantizationMatrix = { {16, 11, 10, 16, 24, 40, 51, 61},
+																 {12, 12, 14, 19, 26, 58, 60, 55},
+																 {14, 13, 16, 24, 40, 57, 69, 56},
+																 {14, 17, 22, 29, 51, 87, 80, 62},
+																 {18, 22, 37, 56, 68, 109, 103, 77},
+																 {24, 35, 55, 64, 81, 104, 113, 92},
+																 {49, 64, 78, 87, 103, 121, 120, 101},
+																 {72, 92, 95, 98, 112, 100, 103, 99} };
+
+		return quantizationMatrix;
+		
+	}
+	
+	virtual void quantizeChunk(const Chunk& inputChunk, Chunk& outputChunk) {
+		
+		int size = inputChunk.getChunkSize();
+		int result;
+		int inputValue;
+		int matrixValue;
+		
+		for (int ch = 0; ch < 3; ch++) {
+			for (int u = 0; u < size; u++) {
+				for (int v = 0; v < size; v++) {
+					inputValue = inputChunk[ch][u][v];
+					matrixValue = getQuantizationMatrix()[u][v];
+					result = std::round(inputValue / matrixValue);
+					outputChunk[ch][u][v] = result;
+				}
+			}
+		}
+	}
+	virtual void dequantizeChunk(const Chunk& encodedChunk, Chunk& outputChunk) {
+		
+		int size = encodedChunk.getChunkSize();
+		int result;
+		int encodedValue;
+		int matrixValue;
+		
+		for (int ch = 0; ch < 3; ch++) {
+			for (int u = 0; u < size; u++) {
+				for (int v = 0; v < size; v++) {
+					encodedValue = encodedChunk[ch][u][v];
+					matrixValue = getQuantizationMatrix()[u][v];
+					result = encodedValue * matrixValue;
+					outputChunk[ch][u][v] = result;
+				}
+			}
+		}
+	}
+	
+
 
 public:
     // Virtual destructor for proper inheritance
@@ -623,11 +677,56 @@ public:
         for (int i = 0; i < result.getTotalChunks(); i++) {
             const Chunk& inputChunk = chunkedImage.getChunkAt(i);
             Chunk& resultChunk = result.getChunkAt(i);
-            decodeChunk(inputChunk, resultChunk);
+            quantizeChunk(inputChunk, resultChunk);
         }
         
         return result;
     }
+	
+	ChunkedImage applyQuantization(const ChunkedImage& chunkedImage) {
+		
+		// Check that the chunk size is 8x8
+        if (chunkedImage.getChunkSize() != 8) {
+            throw std::runtime_error(
+                "ChunkedImage chunk size (" + std::to_string(chunkedImage.getChunkSize()) + 
+                ") is not 8. Default quantizer currently only supports 8x8 chunks."
+            );
+        }
+		
+        ChunkedImage result = chunkedImage.createFreshCopyForTransformResult(transformSpace);
+		
+        // Apply decoding to each chunk
+        for (int i = 0; i < result.getTotalChunks(); i++) {
+            const Chunk& inputChunk = chunkedImage.getChunkAt(i);
+            Chunk& resultChunk = result.getChunkAt(i);
+            dequantizeChunk(inputChunk, resultChunk);
+        }
+        
+        return result;
+
+	}
+	
+	ChunkedImage applyInverseQuantization(const ChunkedImage& chunkedImage) {
+		
+        if (chunkedImage.getChunkSize() != 8) {
+            throw std::runtime_error(
+                "ChunkedImage chunk size (" + std::to_string(chunkedImage.getChunkSize()) + 
+                ") is not 8. Default quantizer currently only supports 8x8 chunks."
+            );
+        }
+		
+        ChunkedImage result = chunkedImage.createFreshCopyForTransformResult(transformSpace);
+		
+        // Apply decoding to each chunk
+        for (int i = 0; i < result.getTotalChunks(); i++) {
+            const Chunk& inputChunk = chunkedImage.getChunkAt(i);
+            Chunk& resultChunk = result.getChunkAt(i);
+            decodeChunk(inputChunk, resultChunk);
+        }
+        
+        return result;
+
+	}
     
     // Accessor methods
     TransformSpace getTransformSpace() const { return transformSpace; }
