@@ -5,6 +5,15 @@
 #include "dpcm.hpp"
 #include "utils/image_lib.hpp"
 
+void printArray(int *arr, int size);
+int sum(int *arr, int size);
+int dotProduct(int *arr1, int *arr2, int size);
+int *createLinearArray(int size);
+int *zigzagFlattenArray(int **arr, int size);
+int *zigzagFlattenArray(const std::vector<int> *arr, int size);
+int **unflattenArray(int *arr, int size);
+int linearPredictor(int *arr, int size); //size means the number of previous variables to use
+
 void printArray(int *arr, int size) {
 	
 	printf("[ ");
@@ -266,103 +275,3 @@ namespace dpcm {
 	}
 	
 }
-void test_flatten() {
-	
-	printf("Testing flatten...\n");
-	
-	int **test = (int **)malloc(sizeof(int *)*8);
-	for (int i = 0; i < 8; i++) {
-		test[i] = (int *)malloc(sizeof(int)*8);
-		for (int j = 0; j < 8; j++) {
-			test[i][j] = (i+1)*(j+1);
-		}
-		printArray(test[i], 8);
-	}
-	
-	int *flat = zigzagFlattenArray(test, 8);
-	printArray(flat, 64);
-	
-	printf("Testing unflatten...\n");
-	
-	int **chunk = unflattenArray(flat, 8);
-	
-	free(flat);
-	
-	for (int i = 0; i < 8; i++) {
-		free(test[i]);
-	}
-	free(test);
-	
-	for (int i = 0; i < 8; i++) {
-		printArray(chunk[i], 8);
-		free(chunk[i]);
-	}
-	free(chunk);
-	
-}
-
-// void test_linear() {
-	
-	// printf("Testing linear predictor...\n");
-	
-	// int *test = (int *)malloc(sizeof(int)*4);
-	// for (int i = 0; i < 4; i ++) {
-		// test[i] = (i+1)*12;
-	// }
-	
-	// printArray(test, 4);
-	
-	// int next = linearPredictor(test, 4);
-	// printf("next = %d\n", next);
-// }
-
-// void test_encoder() {
-	
-	// printf("Testing encoder...\n");
-	
-	// int **test = (int **)malloc(sizeof(int *)*8);
-	// for (int i = 0; i < 8; i++) {
-		// test[i] = (int *)malloc(sizeof(int)*8);
-		// for (int j = 0; j < 8; j++) {
-			// test[i][j] = (i+1)*(j+1);
-		// }
-		// printArray(test[i], 8);
-	// }
-	
-	// int *encoded = dpcm::encoder(test);
-	// printArray(encoded, 64);
-	
-	// printf("Testing decoder...\n");
-	
-	// int **decoded = dpcm::decoder(encoded);
-	
-	// free(encoded);
-	
-	// for (int i = 0; i < 8; i++) {
-		// printArray(decoded[i], 8);
-		// free(decoded[i]);
-	// }
-	
-	// free(decoded);
-	
-	// for (int i = 0; i < 8; i++) {
-		// free(test[i]);
-	// }
-	// free(test);
-// }
-
-// int main(int argc, char **argv) {
-	
-    // if (argc > 1)
-    // {
-        // printf("Usage message\n");
-        // return 1;
-    // }
-	
-	// test_flatten();
-	// test_linear();
-	// test_encoder();
-	
-	// return 0;
-	
-// }
