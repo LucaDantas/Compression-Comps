@@ -5,6 +5,9 @@
 	Also a version with more functionalities for general purpose
 */
 
+#ifndef MATRIX_LIB_HPP
+#define MATRIX_LIB_HPP
+
 #include <vector>
 #include <iostream>
 #include <cassert>
@@ -121,4 +124,4 @@ public:
 	}
 };
 
-
+#endif // MATRIX_LIB_HPP

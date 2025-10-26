@@ -1,3 +1,6 @@
+#ifndef RLE_HPP
+#define RLE_HPP
+
 #include <stdlib.h>
 #include <stdio.h>
 // #include "utils/image_lib.hpp"
@@ -63,3 +66,5 @@ namespace rle {
 	}
 	
 }
+
+#endif // RLE_HPP

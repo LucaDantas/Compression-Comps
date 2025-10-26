@@ -1,10 +1,13 @@
+#ifndef ENTROPY_HPP
+#define ENTROPY_HPP
+
 #include <stdlib.h>
 #include <stdio.h>
+#include <vector>
 #include "dpcm.hpp"
 #include <vector>
 #include "rle.hpp"
-#include "entropy.hpp"
-#include "utils/image_lib.hpp"
+#include "image_lib.hpp"
 
 struct EntropyEncoded {
 	std::vector<std::vector<int *>> ACComponent; // ACComponent[channel][pair #][RLE_info (preceding zeroes, value)] (EXCLUDES ALL DC INFO, i.e. chunk contains info for 63 pixels)
@@ -12,10 +15,10 @@ struct EntropyEncoded {
 };
 
 void populateVector(int **arr, std::vector<int *>& targetVector, int size);
-void populateChunk(int **arr, std::vector<int> *chunk)
+void populateChunk(int **arr, std::vector<int> *chunk);
 EntropyEncoded *EntropyEncodeDCT(const ChunkedImage& chunkedImage);
-int *EntropyEncode(const ChunkedImage& chunkedImage);
-void EntropyDecodeDCT(ChunkedImage& chunkedImage, EntropyDecoded *encoded);
+EntropyEncoded *EntropyEncode(const ChunkedImage& chunkedImage);
+void EntropyDecodeDCT(ChunkedImage& chunkedImage, EntropyEncoded *encoded);
 void EntropyDecode(ChunkedImage& chunkedImage, EntropyEncoded *encoded);
 
 void populateVector(int **arr, std::vector<int *>& targetVector, int size) { // starts from j = 1 to ignore DC coefficient
@@ -82,12 +85,12 @@ EntropyEncoded *EntropyEncodeDCT(const ChunkedImage& chunkedImage) {
 }
 
 
-int *EntropyEncode(const ChunkedImage& chunkedImage) {
+EntropyEncoded *EntropyEncode(const ChunkedImage& chunkedImage) {
 	
 	EntropyEncoded *result = NULL;
 	
-	if (chunkedImage.transformSpace == DCT) {
-		result = EntropyEncodeDCT(const ChunkedImage& chunkedImage);
+	if (chunkedImage.getTransformSpace() == TransformSpace::DCT) {
+		result = EntropyEncodeDCT(chunkedImage);
 	} 
 	
 	return result;
@@ -157,7 +160,9 @@ void EntropyDecodeDCT(ChunkedImage& chunkedImage, EntropyEncoded *encoded) {
 
 void EntropyDecode(ChunkedImage& chunkedImage, EntropyEncoded *encoded) {
 	
-	if (chunkedImage.transformSpace == DCT) {
-		EntropyDecodeDCT(ChunkedImage chunkedImage, EntropyDecoded *encoded);
+	if (chunkedImage.getTransformSpace() == TransformSpace::DCT) {
+		EntropyDecodeDCT(chunkedImage, encoded);
 	} 
 }
+
+#endif // ENTROPY_HPP

@@ -1,9 +1,11 @@
+#ifndef DPCM_HPP
+#define DPCM_HPP
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <vector>
 #include <string>
-#include "dpcm.hpp"
-#include "utils/image_lib.hpp"
+#include "image_lib.hpp"
 
 void printArray(int *arr, int size);
 int sum(int *arr, int size);
@@ -275,3 +277,5 @@ namespace dpcm {
 	}
 	
 }
+
+#endif // DPCM_HPP
