@@ -1,7 +1,7 @@
 #include <vector>
 
 struct EntropyEncoded {
-	std::vector<std::vector<int *>> ACComponent; // ACComponent[channel][chunk][RLE_info - pairs] (EXCLUDES ALL DC INFO, i.e. chunk contains info for 63 pixels)
+	std::vector<std::vector<int *>> ACComponent; // ACComponent[channel][pair #][RLE_info (preceding zeroes, value)] (EXCLUDES ALL DC INFO, i.e. chunk contains info for 63 pixels)
 	std::vector<int *> DCComponent; // DCComponent[channel][DPCM_info]
 };
 
