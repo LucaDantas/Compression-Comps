@@ -53,7 +53,7 @@ public:
                             if (u == 0) cu = 1 / std::sqrt(2); else cu = 1;
                             if (v == 0) cv = 1 / std::sqrt(2); else cv = 1;
                             pixel = encodedChunk[ch][u][v];
-                            sum += pixel * cu * cv * std::cos((M_PI * (2*i + 1) * u) / (2.0*n)) * std::cos((M_PI * (2*j + 1) * v) / (2.0*n));
+                            sum += pixel * cu * cv * std::cos((PI * (2*i + 1) * u) / (2.0*n)) * std::cos((PI * (2*j + 1) * v) / (2.0*n));
                         }
                     }
                     outputChunk[ch][i][j] = std::round((2.0 / n) * sum) + 128;
