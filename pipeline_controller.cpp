@@ -8,7 +8,7 @@
 #include "utils/image_lib.hpp"
 #include "utils/dct_transform.hpp"
 #include "utils/sp_transform.hpp"
-// #include "DWT/haar_transform.hpp"  // Uncomment when Haar transform is fixed
+#include "DWT/haar_transform.hpp"  // Uncomment when Haar transform is fixed
 
 // Forward declarations
 struct ProgramArgs {
@@ -244,9 +244,7 @@ Transform* createTransform(const std::string& transformType) {
     } else if (transformType == "SP") {
         transform = new SPTransform();
     } else if (transformType == "HAAR") {
-        // transform = new HaarTransform();
-        std::cout << "Haar transform not implemented yet" << std::endl;
-        exit(1);
+        transform = new HaarTransform();
     } else {
         std::cerr << "Error: Unknown transform type: " << transformType << std::endl;
         return nullptr;
