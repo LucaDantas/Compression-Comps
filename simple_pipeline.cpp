@@ -56,6 +56,13 @@ int main(int argc, char* argv[]) {
         quantizedImg = transform->applyQuantization(transformedImg);
         quantizedEntropy = Image(quantizedImg).getEntropy();
     }
+
+    EntropyEncoded entropyEncoded;
+    if (transformName == "DCT") {
+        entropyEncoded = EntropyEncodeDCT(quantizedImg);
+        
+        EntropyDecodeDCT(quantizedImg, entropyEncoded);
+    }
     
     ChunkedImage dequantizedImg = quantizedImg;
     if (applyQuantization) {

@@ -113,18 +113,18 @@ int main(int argc, char* argv[]) {
     // 5. ENTROPY ENCODING (COMMENTED OUT - BROKEN)
     // ============================================================================
     std::cout << "\n=== STEP 5: ENTROPY ENCODING (SKIPPED - BROKEN) ===" << std::endl;
-    /*
-    EntropyEncoded *entropyEncoded = nullptr;
+    
+    EntropyEncoded entropyEncoded;
     if (transformName == "DCT") {
         std::cout << "Applying entropy encoding (DCT only)..." << std::endl;
-        entropyEncoded = EntropyEncodeDCT(transformedImg);
+        entropyEncoded = EntropyEncodeDCT(quantizedImg);
         std::cout << "Entropy encoding complete!" << std::endl;
         
         std::cout << "Applying entropy decoding..." << std::endl;
-        EntropyDecodeDCT(transformedImg, entropyEncoded);
+        EntropyDecodeDCT(quantizedImg, entropyEncoded);
         std::cout << "Entropy decoding complete!" << std::endl;
     }
-    */
+   
     
     // ============================================================================
     // 6. REVERSE ALL STEPS BACK
