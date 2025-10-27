@@ -677,7 +677,7 @@ public:
         for (int i = 0; i < result.getTotalChunks(); i++) {
             const Chunk& inputChunk = chunkedImage.getChunkAt(i);
             Chunk& resultChunk = result.getChunkAt(i);
-            quantizeChunk(inputChunk, resultChunk);
+            decodeChunk(inputChunk, resultChunk);
         }
         
         return result;
@@ -699,7 +699,7 @@ public:
         for (int i = 0; i < result.getTotalChunks(); i++) {
             const Chunk& inputChunk = chunkedImage.getChunkAt(i);
             Chunk& resultChunk = result.getChunkAt(i);
-            dequantizeChunk(inputChunk, resultChunk);
+            quantizeChunk(inputChunk, resultChunk);
         }
         
         return result;
@@ -721,7 +721,7 @@ public:
         for (int i = 0; i < result.getTotalChunks(); i++) {
             const Chunk& inputChunk = chunkedImage.getChunkAt(i);
             Chunk& resultChunk = result.getChunkAt(i);
-            decodeChunk(inputChunk, resultChunk);
+            dequantizeChunk(inputChunk, resultChunk);
         }
         
         return result;
