@@ -9,12 +9,14 @@
 #include "utils/entropy.hpp"
 #include "utils/dpcm.hpp"
 #include "utils/rle.hpp"
+#include "utils/metrics.cpp"
 
 int main(int argc, char* argv[]) {
     // Check command line arguments
-    if (argc != 2) {
-        std::cerr << "Usage: " << argv[0] << " <transform_name>" << std::endl;
-        std::cerr << "Available transforms: DCT, SP, HAAR" << std::endl;
+    if (argc != 4) {
+        std::cerr << "Usage: " << argv[0] << " <transform_name> <chunk_size> <image_path>" << std::endl;
+        std::cerr << "Example: " << argv[0] << " DCT 8 Datasets/KodakImages/1.png" << std::endl;
+        std::cerr << "\nAvailable transforms: DCT, SP, HAAR" << std::endl;
         return 1;
     }
     
@@ -22,31 +24,20 @@ int main(int argc, char* argv[]) {
     std::string transformName = argv[1];
     std::transform(transformName.begin(), transformName.end(), transformName.begin(), ::toupper);
     
-    // Validate transform name
-    if (transformName != "DCT" && transformName != "SP" && transformName != "HAAR") {
-        std::cerr << "Error: Invalid transform name '" << argv[1] << "'. Must be DCT, SP, or HAAR." << std::endl;
-        return 1;
-    }
+    // Get chunk size
+    int chunkSize = std::stoi(argv[2]);
     
-    // Hardcoded file path (user will modify this)
-    std::string imagePath = "Datasets/KodakImages/1.png"; // TODO: user will hardcode this
+    bool applyQuantization = (chunkSize == 8);
+    std::string imagePath = argv[3];
     
-    // Load image
-    std::cout << "Loading image from: " << imagePath << std::endl;
-    Image img(imagePath);
-    std::cout << "Image loaded successfully!" << std::endl;
+    // Read and process image
+    Image originalImg(imagePath);
+    Image img(originalImg);
+    double originalEntropy = originalImg.getEntropy();
     
-    // Convert to YCbCr
-    std::cout << "\nConverting image to YCbCr..." << std::endl;
     img.convertToYCbCr();
-    std::cout << "Conversion to YCbCr complete!" << std::endl;
+    ChunkedImage chunkedImg(img, chunkSize);
     
-    // Create ChunkedImage with chunk size 8
-    std::cout << "\nCreating ChunkedImage with chunk size 8..." << std::endl;
-    ChunkedImage chunkedImg(img, 8);
-    std::cout << "ChunkedImage created!" << std::endl;
-    
-    // Create transform based on command line argument
     Transform* transform = nullptr;
     if (transformName == "DCT") {
         transform = new DCTTransform();
@@ -56,55 +47,40 @@ int main(int argc, char* argv[]) {
         transform = new HaarTransform();
     }
     
-    std::cout << "\nUsing transform: " << transformName << std::endl;
+    ChunkedImage transformedImg = transform->applyTransform(chunkedImg);
+    double transformedEntropy = Image(transformedImg).getEntropy();
     
-    // Apply forward transform (encoding)
-    std::cout << "\nApplying forward transform (encoding)..." << std::endl;
-    ChunkedImage encodedImg = transform->applyTransform(chunkedImg);
-    std::cout << "Encoding complete!" << std::endl;
-    
-    // Apply entropy encoding (only for DCT)
-    EntropyEncoded *entropyEncoded = nullptr;
-    if (transformName == "DCT") {
-        std::cout << "\nApplying entropy encoding (DCT only)..." << std::endl;
-        entropyEncoded = EntropyEncodeDCT(encodedImg);
-        std::cout << "Entropy encoding complete!" << std::endl;
-        
-        std::cout << "\nApplying entropy decoding..." << std::endl;
-        // Note: entropy decoding modifies the encodedImg in place
-        EntropyDecodeDCT(encodedImg, entropyEncoded);
-        std::cout << "Entropy decoding complete!" << std::endl;
+    ChunkedImage quantizedImg = transformedImg;
+    double quantizedEntropy = transformedEntropy;
+    if (applyQuantization) {
+        quantizedImg = transform->applyQuantization(transformedImg);
+        quantizedEntropy = Image(quantizedImg).getEntropy();
     }
     
-    // Apply inverse transform (decoding)
-    std::cout << "\nApplying inverse transform (decoding)..." << std::endl;
-    ChunkedImage decodedImg = transform->applyInverseTransform(encodedImg);
-    std::cout << "Decoding complete!" << std::endl;
+    ChunkedImage dequantizedImg = quantizedImg;
+    if (applyQuantization) {
+        dequantizedImg = transform->applyInverseQuantization(quantizedImg);
+    }
     
-    // Convert back to Image
+    ChunkedImage decodedImg = transform->applyInverseTransform(dequantizedImg);
     Image resultImg(decodedImg);
-    
-    // Convert back to RGB
-    std::cout << "\nConverting back to RGB..." << std::endl;
     resultImg.convertToRGB();
-    std::cout << "Conversion to RGB complete!" << std::endl;
     
-    // Write to PNG
     std::string outputPath = "savedImages/output_" + transformName + ".png";
-    std::cout << "\nSaving image to: " << outputPath << std::endl;
-    if (resultImg.saveAsPNG(outputPath)) {
-        std::cout << "Image saved successfully!" << std::endl;
-    } else {
-        std::cerr << "Failed to save image" << std::endl;
-        delete transform;
-        return 1;
-    }
+    resultImg.saveAsPNG(outputPath);
     
-    // Cleanup
+    double mse = metrics::MSE(originalImg, resultImg);
+    double psnr = metrics::PSNR(originalImg, resultImg);
+    double mseChannels[3];
+    metrics::MSEChannels(originalImg, resultImg, mseChannels);
+    
+    std::cout << "Transform: " << transformName << ", Chunk Size: " << chunkSize << std::endl;
+    std::cout << "MSE: " << mse << ", PSNR: " << psnr << " dB" << std::endl;
+    std::cout << "MSE (R/G/B): " << mseChannels[0] << "/" << mseChannels[1] << "/" << mseChannels[2] << std::endl;
+    std::cout << "Entropy (original/transformed/quantized): " << originalEntropy << "/" << transformedEntropy << "/" << quantizedEntropy << std::endl;
+    std::cout << "Output: " << outputPath << std::endl;
+    
     delete transform;
-    
-    // Note: EntropyEncoded cleanup would require freeing all the internal pointers
-    // For now, we'll skip this for simplicity
     
     return 0;
 }
