@@ -8,15 +8,28 @@
 #include "image_lib.hpp"
 
 void printArray(int *arr, int size);
+void printArray(const int *arr, int size);
 int sum(int *arr, int size);
 int dotProduct(int *arr1, int *arr2, int size);
 int *createLinearArray(int size);
 int *zigzagFlattenArray(int **arr, int size);
 int *zigzagFlattenArray(const std::vector<int> *arr, int size);
-int **unflattenArray(int *arr, int size);
+std::vector<std::vector<int>> unflattenArray(const std::vector<int>& arr, int size);
 int linearPredictor(int *arr, int size); //size means the number of previous variables to use
 
 void printArray(int *arr, int size) {
+	
+	printf("[ ");
+	
+	for (int i = 0; i < size; i++) {
+		printf("%d ", arr[i]);
+	}
+	
+	printf("]\n");
+	
+}
+
+void printArray(const int *arr, int size) {
 	
 	printf("[ ");
 	
@@ -149,7 +162,7 @@ int *zigzagFlattenArray(const std::vector<int> *arr, int size) {
 	return flat;
 }
 
-int **unflattenArray(int *arr, int size) {
+std::vector<std::vector<int>> unflattenArray(const std::vector<int>& arr, int size) {
 	
 	int i = 0;
 	int j = 0;
@@ -159,11 +172,8 @@ int **unflattenArray(int *arr, int size) {
 	int dir = 1;
 	int sign = 1;
 	
-	int **chunk = (int **)malloc(sizeof(int *)*size);
-	for (int i = 0; i < 8; i++) {
-		chunk[i] = (int *)malloc(sizeof(int)*8);
-	}
-	
+	std::vector<std::vector<int>> chunk(size, std::vector<int>(size, 0));
+
 	for (int rep = -7; rep < 8; rep++) {
 		ste = 7 - abs(rep);
 		
@@ -228,7 +238,7 @@ int linearPredictor(int *y_arr, int size) {
 namespace dpcm {
 	int *encoder(int *arr, int size, int prediction_size) {
 		
-		int *result = (int *)malloc(sizeof(int)*size*size);
+		int *result = (int *)malloc(sizeof(int)*size);
 		int *sample = (int *)malloc(sizeof(int)*prediction_size);
 		
 		int i = 0;
@@ -238,7 +248,7 @@ namespace dpcm {
 			i++;
 		}
 		
-		while (i < size*size) {
+		while (i < size) {
 			for (int j = 0; j < prediction_size; j++) {
 				sample[j] = arr[i - (prediction_size-j)];
 			}
@@ -253,27 +263,27 @@ namespace dpcm {
 
 	int *decoder(int *arr, int size, int prediction_size) {
 		
-		int *flattened_chunk = (int *)malloc(sizeof(int)*size*size);
+		int *result = (int *)malloc(sizeof(int)*size);
 		int *sample = (int *)malloc(sizeof(int)*prediction_size);
 		
 		int i = 0;
 		
 		while (i < prediction_size) {
-			flattened_chunk[i] = arr[i];
+			result[i] = arr[i];
 			i++;
 		}	
 		
-		while (i < size*size) {
+		while (i < size) {
 			for (int j = 0; j < prediction_size; j++) {
-				sample[j] = flattened_chunk[i - (prediction_size-j)];
+				sample[j] = result[i - (prediction_size-j)];
 			}
 			
-			flattened_chunk[i] = arr[i] + linearPredictor(sample, prediction_size);
+			result[i] = arr[i] + linearPredictor(sample, prediction_size);
 			i++;
 		}
 		
 		free(sample);
-		return flattened_chunk;
+		return result;
 	}
 	
 }

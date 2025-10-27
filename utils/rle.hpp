@@ -8,55 +8,53 @@
 
 namespace rle {
 	
-	int **encoder(int *flat, int size) {
+	std::vector<std::pair<int, int>> encoder(int *flat, int size) {
 		
-		int **result = (int **)malloc(sizeof(int *)*size*size); //2d array, result[i] = (# preceding zeroes, n)
+		std::vector<std::pair<int, int>> result(size*size, std::make_pair(-1, -1)); //2d array, result[i] = (# preceding zeroes, n)
+		
 		int j = 0;
-		int *curRun = (int *)malloc(sizeof(int)*2);
-		curRun[0] = 0;
-		curRun[1] = 0;
+		std::pair<int, int> curRun = std::make_pair(0, 0);
 		
-		for (int i = 0; i < size*size; i++) {
+		for (int i = 1; i < size*size; i++) {
 			
-			if (i < size*size-1 && flat[i] == 0 && curRun[0] < 15) {
-				curRun[0] += 1;
+			if (i < size*size-1 && flat[i] == 0 && curRun.first < 15) {
+				curRun.first += 1;
 			} else {
-				curRun[1] = flat[i];
+				curRun.second = flat[i];
 				result[j] = curRun;
-				curRun = (int *)malloc(sizeof(int)*2);
-				curRun[0] = 0;
-				curRun[1] = 0;
+				curRun = std::make_pair(0, 0);
 				j++;
 			}
 			
 		}
 		
-		if (j < size*size - 1) {
-			result[j] = NULL;
+		if (j < size*size-1) {
+			result[j] = std::make_pair(-1, -1);
 		}
 		
 		return result;
 	}
 	
-	int *decoder(int **arr, int size) {
+	std::vector<int> decoder(const std::vector<std::pair<int, int>>& arr, int size) {
 		
-		int *flat = (int *)malloc(sizeof(int)*size*size);
-		int *curRun = NULL;
+		std::vector<int> flat(size*size, 0);
+		std::pair<int, int> curRun;
 		
 		int j = 0;
 		int k = 0; // flat counter
-		while (j < size*size && arr[j] != NULL) {
+
+		while (k < size*size && j < size*size && arr[j].first > -1) {
 			curRun = arr[j];
-			if (curRun[0] > 15 && j == 0 && k == 0){
+			if (curRun.first > 15 && j == 0 && k == 0) { // check for throwaway DC pair at chunk[0][0]
 				flat[k] = -1;
 				k++;
 				j++;
 			} else {
-				for (int i = curRun[0]; i > 0; i--) {
+				for (int i = curRun.first; i > 0; i--) {
 					flat[k] = 0;
 					k++;
 				}
-				flat[k] = curRun[1];
+				flat[k] = curRun.second;
 				k++;
 				j++;
 			}
