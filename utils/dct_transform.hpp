@@ -6,6 +6,8 @@
 
 // Example implementation: DCT Transform
 class DCTTransform : public Transform {
+private:
+    const double PI = std::acos(-1.0);
 public:
     // Constructor specifies DCT transform space
     DCTTransform() : Transform(TransformSpace::DCT) {}
@@ -26,7 +28,7 @@ public:
                     for (int i = 0; i < n; i++) {
                         for (int j = 0; j < n; j++) {
                             pixel = inputChunk[ch][i][j] - 128;
-                            sum += pixel * std::cos((M_PI * (2*i + 1) * u) / (2.0*n)) * std::cos((M_PI * (2*j + 1) * v) / (2.0*n));
+                            sum += pixel * std::cos((PI * (2*i + 1) * u) / (2.0*n)) * std::cos((PI * (2*j + 1) * v) / (2.0*n));
                         }
                     }
                     outputChunk[ch][u][v] = std::round((2.0 / n) * cu * cv * sum);
@@ -51,7 +53,7 @@ public:
                             if (u == 0) cu = 1 / std::sqrt(2); else cu = 1;
                             if (v == 0) cv = 1 / std::sqrt(2); else cv = 1;
                             pixel = encodedChunk[ch][u][v];
-                            sum += pixel * cu * cv * std::cos((M_PI * (2*i + 1) * u) / (2.0*n)) * std::cos((M_PI * (2*j + 1) * v) / (2.0*n));
+                            sum += pixel * cu * cv * std::cos((PI * (2*i + 1) * u) / (2.0*n)) * std::cos((PI * (2*j + 1) * v) / (2.0*n));
                         }
                     }
                     outputChunk[ch][i][j] = std::round((2.0 / n) * sum) + 128;

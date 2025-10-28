@@ -21,6 +21,7 @@ enum class TransformSpace {
     Raw,        // Raw image data
     DCT,        // Discrete Cosine Transform
     DWT,        // Discrete Wavelet Transform
+    Haar,       // Haar Wavelet Transform
     SP          // S+P Transform
 };
 
@@ -77,6 +78,11 @@ public:
             throw std::runtime_error("Invalid channel index. Must be 0, 1, or 2");
         }
         return val[idx];
+    }
+
+    // Pixel difference function with scaling
+    Pixel getScaledPixelDifference(const Pixel& other, int scale = 100) const {
+        return Pixel(scale * abs(val[0] - other.val[0]), scale * abs(val[1] - other.val[1]), scale * abs(val[2] - other.val[2]));
     }
 
     // Conversion methods
@@ -159,6 +165,7 @@ public:
     int getRows() const { return rows; }
     int getColumns() const { return columns; }
     const Pixel& getPixel(int row, int col) const { return pixels[row][col]; }
+    Pixel& getPixel(int row, int col) { return pixels[row][col]; }
     TransformSpace getTransformSpace() const { return transformSpace; }
     ColorSpace getColorSpace() const { return colorSpace; }
 
@@ -233,20 +240,24 @@ public:
         }
         
         // Check if the image is in Raw transform space
+        // COMMENTED OUT FOR NOW - allow saving any transform space
+        /*
         if (transformSpace != TransformSpace::Raw) {
             std::cerr << "Error: Image must be in Raw transform space to save as PNG. Current transform space: " 
                       << transformSpaceToString(transformSpace) << std::endl;
             return false;
         }
+        */
         
-        // Convert pixel data to flat RGB array for STB
+        // Convert pixel data to flat RGB array for STB with clamping
         std::vector<unsigned char> rgbData(rows * columns * 3);
         int idx = 0;
         for (int row = 0; row < rows; row++) {
             for (int col = 0; col < columns; col++) {
-                rgbData[idx++] = static_cast<unsigned char>(pixels[row][col][0]); // R
-                rgbData[idx++] = static_cast<unsigned char>(pixels[row][col][1]); // G
-                rgbData[idx++] = static_cast<unsigned char>(pixels[row][col][2]); // B
+                // Clamp values to [0, 255] range
+                rgbData[idx++] = static_cast<unsigned char>(std::min(255, std::max(0, pixels[row][col][0]))); // R
+                rgbData[idx++] = static_cast<unsigned char>(std::min(255, std::max(0, pixels[row][col][1]))); // G
+                rgbData[idx++] = static_cast<unsigned char>(std::min(255, std::max(0, pixels[row][col][2]))); // B
             }
         }
         
@@ -261,7 +272,111 @@ public:
         std::cout << "Successfully saved image as PNG: " << filename << std::endl;
         return true;
     }
+    
+    // Save individual channel as black and white image
+    bool saveChannelAsBW(const std::string& filename, int channel, int scale = 1) const {
+        // Check if the image is in RGB format
+        if (colorSpace != ColorSpace::RGB) {
+            std::cerr << "Error: Image must be in RGB format to save channel as BW. Current color space: " 
+                      << colorSpaceToString(colorSpace) << std::endl;
+            return false;
+        }
+        
+        // Check if the image is in Raw transform space
+        // COMMENTED OUT FOR NOW - allow saving any transform space
+        /*
+        if (transformSpace != TransformSpace::Raw) {
+            std::cerr << "Error: Image must be in Raw transform space to save channel as BW. Current transform space: " 
+                      << transformSpaceToString(transformSpace) << std::endl;
+            return false;
+        }
+        */
+        
+        // Validate channel index
+        if (channel < 0 || channel >= 3) {
+            std::cerr << "Error: Channel index must be 0 (R), 1 (G), or 2 (B)" << std::endl;
+            return false;
+        }
+        
+        // Convert pixel data to flat grayscale array for STB with clamping
+        std::vector<unsigned char> grayData(rows * columns);
+        int idx = 0;
+        for (int row = 0; row < rows; row++) {
+            for (int col = 0; col < columns; col++) {
+                int value = pixels[row][col][channel] * scale;
+                // Clamp value to valid range [0, 255]
+                value = std::min(255, std::max(0, value));
+                grayData[idx++] = static_cast<unsigned char>(value);
+            }
+        }
+        
+        // Write PNG file using STB (grayscale, 1 channel)
+        int result = stbi_write_png(filename.c_str(), columns, rows, 1, grayData.data(), columns);
+        
+        if (result == 0) {
+            std::cerr << "Error: Failed to write PNG file: " << filename << std::endl;
+            return false;
+        }
+        
+        std::cout << "Successfully saved channel " << channel << " as BW PNG: " << filename << std::endl;
+        return true;
+    }
+    
+    // Save all channels as separate black and white images
+    bool saveAllChannelsAsBW(const std::string& baseFilename, int scale = 1) const {
+        std::string channelNames[] = {"R", "G", "B"};
+        bool allSuccess = true;
+        
+        for (int ch = 0; ch < 3; ch++) {
+            std::string filename = baseFilename + "_" + channelNames[ch] + ".png";
+            if (!saveChannelAsBW(filename, ch, scale)) {
+                allSuccess = false;
+            }
+        }
+        
+        return allSuccess;
+    }
 };
+
+// Function to compute pixel-wise difference between two images
+Image imageDiff(const Image& img1, const Image& img2, int scale = 100) {
+    // Check if images have the same dimensions
+    if (img1.getRows() != img2.getRows() || img1.getColumns() != img2.getColumns()) {
+        throw std::runtime_error("Images must have the same dimensions for difference computation");
+    }
+    
+    // Check if both images are in the same color space
+    if (img1.getColorSpace() != img2.getColorSpace()) {
+        throw std::runtime_error("Images must be in the same color space for difference computation");
+    }
+    
+    // Check if both images are in Raw transform space
+    // COMMENTED OUT FOR NOW - allow difference computation for any transform space
+    /*
+    if (img1.getTransformSpace() != TransformSpace::Raw || img2.getTransformSpace() != TransformSpace::Raw) {
+        throw std::runtime_error("Both images must be in Raw transform space for difference computation");
+    }
+    */
+    
+    // Create result image with same dimensions and properties as input images
+    Image result = img1; // Copy constructor to get same dimensions and properties
+    
+    // Compute pixel-wise difference
+    for (int row = 0; row < img1.getRows(); row++) {
+        for (int col = 0; col < img1.getColumns(); col++) {
+            const Pixel& pixel1 = img1.getPixel(row, col);
+            const Pixel& pixel2 = img2.getPixel(row, col);
+            
+            // Use the scaled pixel difference function to compute difference
+            Pixel diffPixel = pixel1.getScaledPixelDifference(pixel2, scale);
+            
+            // Set the difference pixel in the result image
+            result.getPixel(row, col) = diffPixel;
+        }
+    }
+    
+    return result;
+}
 
 class Chunk {
 private:
@@ -463,6 +578,60 @@ protected:
     // These are protected so only derived classes can call them
     virtual void encodeChunk(const Chunk& inputChunk, Chunk& outputChunk) = 0;
     virtual void decodeChunk(const Chunk& encodedChunk, Chunk& outputChunk) = 0;
+	
+	virtual std::vector<std::vector<int>> getQuantizationMatrix() {
+		
+		std::vector<std::vector<int>> quantizationMatrix = { {16, 11, 10, 16, 24, 40, 51, 61},
+																 {12, 12, 14, 19, 26, 58, 60, 55},
+																 {14, 13, 16, 24, 40, 57, 69, 56},
+																 {14, 17, 22, 29, 51, 87, 80, 62},
+																 {18, 22, 37, 56, 68, 109, 103, 77},
+																 {24, 35, 55, 64, 81, 104, 113, 92},
+																 {49, 64, 78, 87, 103, 121, 120, 101},
+																 {72, 92, 95, 98, 112, 100, 103, 99} };
+
+		return quantizationMatrix;
+		
+	}
+	
+	virtual void quantizeChunk(const Chunk& inputChunk, Chunk& outputChunk) {
+		
+		int size = inputChunk.getChunkSize();
+		int result;
+		int inputValue;
+		int matrixValue;
+		
+		for (int ch = 0; ch < 3; ch++) {
+			for (int u = 0; u < size; u++) {
+				for (int v = 0; v < size; v++) {
+					inputValue = inputChunk[ch][u][v];
+					matrixValue = getQuantizationMatrix()[u][v];
+					result = std::round(inputValue / matrixValue);
+					outputChunk[ch][u][v] = result;
+				}
+			}
+		}
+	}
+	virtual void dequantizeChunk(const Chunk& encodedChunk, Chunk& outputChunk) {
+		
+		int size = encodedChunk.getChunkSize();
+		int result;
+		int encodedValue;
+		int matrixValue;
+		
+		for (int ch = 0; ch < 3; ch++) {
+			for (int u = 0; u < size; u++) {
+				for (int v = 0; v < size; v++) {
+					encodedValue = encodedChunk[ch][u][v];
+					matrixValue = getQuantizationMatrix()[u][v];
+					result = encodedValue * matrixValue;
+					outputChunk[ch][u][v] = result;
+				}
+			}
+		}
+	}
+	
+
 
 public:
     // Virtual destructor for proper inheritance
@@ -513,6 +682,51 @@ public:
         
         return result;
     }
+	
+	ChunkedImage applyQuantization(const ChunkedImage& chunkedImage) {
+		
+		// Check that the chunk size is 8x8
+        if (chunkedImage.getChunkSize() != 8) {
+            throw std::runtime_error(
+                "ChunkedImage chunk size (" + std::to_string(chunkedImage.getChunkSize()) + 
+                ") is not 8. Default quantizer currently only supports 8x8 chunks."
+            );
+        }
+		
+        ChunkedImage result = chunkedImage.createFreshCopyForTransformResult(transformSpace);
+		
+        // Apply decoding to each chunk
+        for (int i = 0; i < result.getTotalChunks(); i++) {
+            const Chunk& inputChunk = chunkedImage.getChunkAt(i);
+            Chunk& resultChunk = result.getChunkAt(i);
+            quantizeChunk(inputChunk, resultChunk);
+        }
+        
+        return result;
+
+	}
+	
+	ChunkedImage applyInverseQuantization(const ChunkedImage& chunkedImage) {
+		
+        if (chunkedImage.getChunkSize() != 8) {
+            throw std::runtime_error(
+                "ChunkedImage chunk size (" + std::to_string(chunkedImage.getChunkSize()) + 
+                ") is not 8. Default quantizer currently only supports 8x8 chunks."
+            );
+        }
+		
+        ChunkedImage result = chunkedImage.createFreshCopyForTransformResult(transformSpace);
+		
+        // Apply decoding to each chunk
+        for (int i = 0; i < result.getTotalChunks(); i++) {
+            const Chunk& inputChunk = chunkedImage.getChunkAt(i);
+            Chunk& resultChunk = result.getChunkAt(i);
+            dequantizeChunk(inputChunk, resultChunk);
+        }
+        
+        return result;
+
+	}
     
     // Accessor methods
     TransformSpace getTransformSpace() const { return transformSpace; }

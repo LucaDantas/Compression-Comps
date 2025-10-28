@@ -1,0 +1,10 @@
+# Generated images directory
+savedImages/
+
+# Compiled executables
+pipeline_controller
+sp_pipeline_controller
+
+# Other generated files
+decodedImage.png
+differenceImage.png
