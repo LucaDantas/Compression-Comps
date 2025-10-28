@@ -9,7 +9,7 @@
 
 #include <cassert>
 #include <vector>
-#include "image_lib.hpp" 
+#include "utils/image_lib.hpp" 
 
 namespace cscomps {
 namespace sp {
@@ -52,9 +52,9 @@ struct Subbands {
   int ll_w, ll_h; // = w/2, h/2 (ceil for odds)
 };
 
-class Transform {
+class SPCore {
  public:
-  explicit Transform(Params p = Params::NaturalImage()) : P(p) {}
+  explicit SPCore(Params p = Params::NaturalImage()) : P(p) {}
 
   // 2-D forward S+P. Repeats on LL.
   void forward2D(Plane plane) const {
@@ -123,6 +123,10 @@ class Transform {
     if (x >= 0) return x >> shift;
     return -(((-x) + (k - 1)) >> shift);
   }
+  // floor division by positive integer d
+  static inline int floor_div_pos(int x, int d) {
+    return (x >= 0) ? (x / d) : -(((-x) + d - 1) / d);
+  }
   static inline int clampi(int v, int lo, int hi) {
     return (v < lo) ? lo : (v > hi ? hi : v);
   }
@@ -134,6 +138,8 @@ class Transform {
     int m = p % (2 * (n - 1));
     return (m < n) ? m : (2 * (n - 1) - m);
   }
+  
+// To map 1D index with border handling to [0, n-1]
   inline int idx1D(int i, int n) const {
     if (P.border == Params::Border::Clamp) return clampi(i, 0, n - 1);
     return mirrorIndex(i, n);
@@ -154,7 +160,7 @@ class Transform {
     return L;
   }
 
-  //           1-D forward
+  // 1-D forward
   void forward1D(int* data, int n) const {
     assert(n >= 1);
     const int nS = sub_LL_dim(n); // # of lowpass samples
@@ -205,33 +211,50 @@ class Transform {
     assert(n >= 1);
     const int nS = sub_LL_dim(n);
     const int nD = sub_H_dim(n);
-    // This should fix the issue of prediction errors
-    // Undo predictor: d1[l] = d[l] + floor( pred / 2^shift )
-    // pred uses s[...] and d1[l+1]; we approximate d1[l+1] using d[l+1],
-    // which is consistent with the forward clamping at the border and
-    // preserves reversibility with these parameters.
+
+    // Undo predictor exactly, mirroring forward:
+    // - Reconstruct d1 right-to-left so d1[l+1] is available.
+    // - At right border (l==nD-1), solve implicit self-clamp in closed form.
     tempRow.resize(n);
 
-    for (int l = 0; l < nS; ++l) tempRow[l] = data[l];        // s
+    for (int l = 0; l < nS; ++l) tempRow[l] = data[l]; // s
     for (int l = 0; l < nD; ++l) tempRow[nS + l] = data[nS + l]; // d (resid)
 
-    // Recreate d1
-    for (int l = 0; l < nD; ++l) {
+    // Recreate d1 right-to-left
+    for (int l = nD - 1; l >= 0; --l) {
       int s_lm1 = tempRow[idx1D(l - 1, nS)];
       int s_l = tempRow[l];
       int s_lp1 = tempRow[idx1D(l + 1, nS)];
       int s_lp2 = tempRow[idx1D(l + 2, nS)];
+      // inverse prediction
+      const int d_res_l = tempRow[nS + l];
+      int s_part = P.beta_m1 * (s_lm1 - s_l) + P.beta_0 * (s_l - s_lp1) +
+                   P.beta_p1 * (s_lp1 - s_lp2);
 
-      int d_res_l = tempRow[nS + l];
-      int d_res_lp1 = tempRow[nS + (l + 1 < nD ? l + 1 : l)];
+      int d1_l;
+      // edge
+      if (l == nD - 1) {
+        // Forward used clamp d1[l+1]=d1[l]; implicit equation: d = d1 - floor((s_part - phi1*d1)/K)
+        // The closed-form used previously is incorrect for many integer combinations.
+        // Solve by fixed-point iteration on pred = floor((s_part - phi1 * d1)/K).
+        // Start with an initial pred estimate using d_res_l, then iterate until
+        // pred stabilizes (typically converges quickly).
+        int pred = floor_divK(s_part - P.phi1 * d_res_l, P.coeff_shift);
+        d1_l = d_res_l + pred;
+        for (int it = 0; it < 10; ++it) {
+          int pred2 = floor_divK(s_part - P.phi1 * d1_l, P.coeff_shift);
+          if (pred2 == pred) break;
+          pred = pred2;
+          d1_l = d_res_l + pred;
+        }
+      } else {
+        int d1_lp1 = tempRow[nS + l + 1];
+        int pred_num = s_part - P.phi1 * d1_lp1;
+        int pred = floor_divK(pred_num, P.coeff_shift);
+        d1_l = d_res_l + pred;
+      }
 
-      int pred_num = P.beta_m1 * (s_lm1 - s_l) + P.beta_0 * (s_l - s_lp1) +
-                     P.beta_p1 * (s_lp1 - s_lp2) - P.phi1 * d_res_lp1;
-
-      int pred = floor_divK(pred_num, P.coeff_shift);
-      int d1 = d_res_l + pred;
-
-      tempRow[nS + l] = d1; // now holds d1
+      tempRow[nS + l] = d1_l; // now holds d1
     }
 
     // Undo S-stage:
@@ -264,7 +287,7 @@ class Transform {
   void inverseCols(int* base, int stride, int w, int h) const {
     for (int x = 0; x < w; ++x) {
       for (int y = 0; y < h; ++y) colBuf[y] = base[y * stride + x];
-        inverse1D(colBuf.data(), h);
+      inverse1D(colBuf.data(), h);
       for (int y = 0; y < h; ++y) base[y * stride + x] = colBuf[y];
     }
   }
@@ -279,7 +302,7 @@ class Transform {
 class SPTransform : public Transform {
 private:
   cscomps::sp::Params params;
-  cscomps::sp::Transform spTransform;
+  cscomps::sp::SPCore spTransform;
 
 public:
   // Constructor with optional S+P parameters
