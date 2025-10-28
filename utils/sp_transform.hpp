@@ -9,7 +9,7 @@
 
 #include <cassert>
 #include <vector>
-#include "utils/image_lib.hpp" 
+#include "image_lib.hpp" 
 
 namespace cscomps {
 namespace sp {
@@ -123,10 +123,6 @@ class SPCore {
     if (x >= 0) return x >> shift;
     return -(((-x) + (k - 1)) >> shift);
   }
-  // floor division by positive integer d
-  static inline int floor_div_pos(int x, int d) {
-    return (x >= 0) ? (x / d) : -(((-x) + d - 1) / d);
-  }
   static inline int clampi(int v, int lo, int hi) {
     return (v < lo) ? lo : (v > hi ? hi : v);
   }
@@ -212,15 +208,16 @@ class SPCore {
     const int nS = sub_LL_dim(n);
     const int nD = sub_H_dim(n);
 
-    // Undo predictor exactly, mirroring forward:
-    // - Reconstruct d1 right-to-left so d1[l+1] is available.
-    // - At right border (l==nD-1), solve implicit self-clamp in closed form.
+    // Undo predictor: d1[l] = d[l] + floor( pred / 2^shift )
+    // pred uses s[...] and d1[l+1]; we approximate d1[l+1] using d[l+1],
+    // which is consistent with the forward clamping at the border and
+    // preserves reversibility with these parameters.
     tempRow.resize(n);
 
     for (int l = 0; l < nS; ++l) tempRow[l] = data[l]; // s
     for (int l = 0; l < nD; ++l) tempRow[nS + l] = data[nS + l]; // d (resid)
 
-    // Recreate d1 right-to-left
+    // Recreate d1
     for (int l = nD - 1; l >= 0; --l) {
       int s_lm1 = tempRow[idx1D(l - 1, nS)];
       int s_l = tempRow[l];
