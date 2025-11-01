@@ -112,7 +112,7 @@ int main(int argc, char* argv[]) {
     // ============================================================================
     // 5. ENTROPY ENCODING (COMMENTED OUT - BROKEN)
     // ============================================================================
-    std::cout << "\n=== STEP 5: ENTROPY ENCODING (SKIPPED - BROKEN) ===" << std::endl;
+    std::cout << "\n=== STEP 5: ENTROPY ENCODING (only for DCT) ===" << std::endl;
     
     EntropyEncoded entropyEncoded;
     if (transformName == "DCT") {

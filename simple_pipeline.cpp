@@ -73,19 +73,13 @@ int main(int argc, char* argv[]) {
     Image resultImg(decodedImg);
     resultImg.convertToRGB();
     
-    std::string outputPath = "savedImages/output_" + transformName + ".png";
-    resultImg.saveAsPNG(outputPath);
+    // std::string outputPath = "savedImages/output_" + transformName + ".png";
+    // resultImg.saveAsPNG(outputPath);
     
     double mse = metrics::MSE(originalImg, resultImg);
     double psnr = metrics::PSNR(originalImg, resultImg);
-    double mseChannels[3];
-    metrics::MSEChannels(originalImg, resultImg, mseChannels);
     
-    std::cout << "Transform: " << transformName << ", Chunk Size: " << chunkSize << std::endl;
-    std::cout << "MSE: " << mse << ", PSNR: " << psnr << " dB" << std::endl;
-    std::cout << "MSE (R/G/B): " << mseChannels[0] << "/" << mseChannels[1] << "/" << mseChannels[2] << std::endl;
-    std::cout << "Entropy (original/transformed/quantized): " << originalEntropy << "/" << transformedEntropy << "/" << quantizedEntropy << std::endl;
-    std::cout << "Output: " << outputPath << std::endl;
+    std::cout << "(" << mse << ", " << psnr << ", " << originalEntropy << ", " << transformedEntropy << ", " << quantizedEntropy << ")" << std::endl;
     
     delete transform;
     
