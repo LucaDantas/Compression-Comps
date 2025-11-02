@@ -372,6 +372,164 @@ protected:
       }
     }
   }
+
+//Quantization
+  struct QTable {
+    std::vector<int> stepLL;  // try lossless for now
+    std::vector<int> stepHL;  // dead-zone
+    std::vector<int> stepLH;  
+    std::vector<int> stepHH;  
+    int deadzone_mult = 1;    // zero-bin half-width = deadzone_mult * step
+  };
+
+  // experimental table
+  static QTable DefaultQ() {
+    return QTable{
+      /*LL*/ {0, 0, 1},
+      /*HL*/ {3, 5, 8},
+      /*LH*/ {3, 5, 8},
+      /*HH*/ {4, 7, 12},
+      /*dz*/ 1
+    };
+  }
+
+  // helpers
+  static inline int q_ll_plain(int x, int step) {
+    return (step > 0) ? (x / step) : x;
+  }
+  static inline int dq_ll_plain(int q, int step) {
+    if (step <= 0) return q;
+    return q * step + (step >> 1); // midpoint
+  }
+
+  static inline int q_hp_deadzone(int x, int step, int dz_mult) {
+    if (step <= 0) return x;
+    const int z = dz_mult * step;  // half-width of zero bin
+    const int ax = (x >= 0) ? x : -x;
+    if (ax < z) return 0;
+    int q = (ax + z) / step;  // uniform bins beyond dead-zone
+    return (x < 0) ? -q : q;
+  }
+  static inline int dq_hp_midpoint(int q, int step) {
+    if (step <= 0) return q;
+    if (q == 0)    return 0;
+    int aq = (q >= 0) ? q : -q;
+    int r  = ((2 * aq - 1) * step) / 2;  // midpoint of bin
+    return (q >= 0) ? r : -r;
+  }
+
+  // Recursive band iterator over LL 
+  template <typename QF_LL, typename QF_HP>
+  static void forEachBandLevel(
+      int* base, int stride, int W, int H, int levels,
+      QF_LL q_ll, QF_HP q_hp) {
+
+    int w = W, h = H;
+    for (int lev = 0; lev < levels; ++lev) {
+      const int wLL = (w + 1) >> 1;
+      const int hLL = (h + 1) >> 1;
+
+      for (int y = 0; y < h; ++y) {
+        int* row = base + y * stride;
+        for (int x = 0; x < w; ++x) {
+          const bool isLL = (x < wLL) && (y < hLL);
+          const bool isHL = (x >= wLL) && (y < hLL);
+          const bool isLH = (x <  wLL) && (y >= hLL);
+          const bool isHH = (x >= wLL) && (y >= hLL);
+
+          row[x] = isLL
+            ? q_ll(row[x], lev)
+            : q_hp(row[x], lev, isHL, isLH, isHH);
+        }
+      }
+      w = wLL; h = hLL; // recurse to next LL
+    }
+  }
+
+  // Public API on SPTransform
+  private:
+    QTable qt = DefaultQ();
+    int levelsFor(int W, int H) const {
+      if (params.levels > 0) return params.levels;
+      int w = W, h = H, L = 0;
+      while (w >= 2 && h >= 2 && L < 10) {
+        ++L; w = (w + 1) >> 1; h = (h + 1) >> 1;
+      }
+      return L;
+    }
+
+  public:
+    //override optional
+    void setQuantTable(const QTable& q) { qt = q; }
+
+    // Quantize a single chunk (override of Transform::quantizeChunk)
+    void quantizeChunk(const Chunk& inputChunk, Chunk& outputChunk) override {
+      const int chunkSize = inputChunk.getChunkSize();
+      // process per channel
+      for (int ch = 0; ch < 3; ++ch) {
+        std::vector<int> plane(chunkSize * chunkSize);
+        for (int y = 0; y < chunkSize; ++y)
+          for (int x = 0; x < chunkSize; ++x)
+            plane[y * chunkSize + x] = inputChunk[ch][y][x];
+
+        const int W = chunkSize, H = chunkSize, S = chunkSize;
+        const int L = levelsFor(W, H);
+
+        auto q_ll = [&](int v, int lev) -> int {
+          const int step = (lev < (int)qt.stepLL.size()) ? qt.stepLL[lev] : 0;
+          return q_ll_plain(v, step);
+        };
+
+        auto q_hp = [&](int v, int lev, bool isHL, bool isLH, bool isHH) -> int {
+          int step = 0;
+          if (isHL) step = (lev < (int)qt.stepHL.size()) ? qt.stepHL[lev] : 0;
+          else if (isLH) step = (lev < (int)qt.stepLH.size()) ? qt.stepLH[lev] : 0;
+          else if (isHH) step = (lev < (int)qt.stepHH.size()) ? qt.stepHH[lev] : 0;
+          return q_hp_deadzone(v, step, qt.deadzone_mult);
+        };
+
+        forEachBandLevel(plane.data(), S, W, H, L, q_ll, q_hp);
+
+        // write back
+        for (int y = 0; y < chunkSize; ++y)
+          for (int x = 0; x < chunkSize; ++x)
+            outputChunk[ch][y][x] = plane[y * chunkSize + x];
+      }
+    }
+
+    // Dequantize a single chunk (override of Transform::dequantizeChunk)
+    void dequantizeChunk(const Chunk& encodedChunk, Chunk& outputChunk) override {
+      const int chunkSize = encodedChunk.getChunkSize();
+      for (int ch = 0; ch < 3; ++ch) {
+        std::vector<int> plane(chunkSize * chunkSize);
+        for (int y = 0; y < chunkSize; ++y)
+          for (int x = 0; x < chunkSize; ++x)
+            plane[y * chunkSize + x] = encodedChunk[ch][y][x];
+
+        const int W = chunkSize, H = chunkSize, S = chunkSize;
+        const int L = levelsFor(W, H);
+
+        auto dq_ll = [&](int q, int lev) -> int {
+          const int step = (lev < (int)qt.stepLL.size()) ? qt.stepLL[lev] : 0;
+          return dq_ll_plain(q, step);
+        };
+
+        auto dq_hp = [&](int q, int lev, bool isHL, bool isLH, bool isHH) -> int {
+          int step = 0;
+          if (isHL) step = (lev < (int)qt.stepHL.size()) ? qt.stepHL[lev] : 0;
+          else if (isLH) step = (lev < (int)qt.stepLH.size()) ? qt.stepLH[lev] : 0;
+          else if (isHH) step = (lev < (int)qt.stepHH.size()) ? qt.stepHH[lev] : 0;
+          return dq_hp_midpoint(q, step);
+        };
+
+        forEachBandLevel(plane.data(), S, W, H, L, dq_ll, dq_hp);
+
+        for (int y = 0; y < chunkSize; ++y)
+          for (int x = 0; x < chunkSize; ++x)
+            outputChunk[ch][y][x] = plane[y * chunkSize + x];
+      }
+    }
+
 };
 
 #endif // CS_COMPS_SP_TRANSFORM_HPP
