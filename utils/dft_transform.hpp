@@ -1,15 +1,16 @@
-#ifndef DCT_TRANSFORM_HPP
-#define DCT_TRANSFORM_HPP
+#ifndef DFT_TRANSFORM_HPP
+#define DFT_TRANSFORM_HPP
 
 #include <cmath>
 #include <complex>
 #include "image_lib.hpp"
 
-// Implementation of DCT Transform using the FFT algorithm.
+// Implementation of DFT Transform using the FFT algorithm. As the pipeline does not support
+// a complex-valued output the forward direction only encodes the real part of the DFT result,
+// and the reverse direction is not implemented.
 class DFTTransform : public Transform {
 private:
     const double PI = std::acos(-1.0);
-    const double RT2 = std::sqrt(2);
 public:
     // Constructor specifies DCT transform space
     DFTTransform() : Transform(TransformSpace::DCT) {}
@@ -77,42 +78,6 @@ public:
         FFT(data, 1);
     }
 
-    void ForwardFCT(std::vector<double>& data) {
-        int n = data.size();
-        std::vector<std::complex<double>> mirrored_data(2*n);
-        for (int i = 0; i < n; i++) {
-            mirrored_data[i] = std::complex<double>(data[i]);
-            mirrored_data[2*n-1-i] = mirrored_data[i];
-        }
-        ForwardFFT(mirrored_data);
-        double theta = -PI / (2*n);
-        double scale = 1 / (std::sqrt(2*n));
-        std::complex<double> w(std::cos(theta), std::sin(theta));
-        std::complex<double> w_n(1);
-        for (int i = 0; i < n; i++) {
-            data[i] = (scale * ((i == 0) ? 1 / RT2 : 1) * w_n * mirrored_data[i]).real();
-            w_n *= w;
-        }
-    }
-
-    void InverseFCT(std::vector<double>& data) {
-        int n = data.size();
-        std::vector<std::complex<double>> mirrored_data(2*n);
-        for (int i = 0; i < n; i++) {
-            mirrored_data[i] = std::complex<double>(data[i]);
-            mirrored_data[2*n-1-i] = std::complex<double>(data[i]);
-        }
-        InverseFFT(mirrored_data);
-        double theta = -PI / (2*n);
-        double scale = 1 / (std::sqrt(2*n));
-        std::complex<double> w(std::cos(theta), std::sin(theta));
-        std::complex<double> w_n(1);
-        for (int i = 0; i < n; i++) {
-            data[i] = (scale * ((i == 0) ? 1 / RT2 : 1) * w_n * mirrored_data[i]).real();
-            w_n *= w;
-        }
-    }
-
 
     // Implement encodeChunk for DFT: O(N^2logN) implementation
     void encodeChunk(const Chunk& inputChunk, Chunk& outputChunk) {
@@ -120,77 +85,54 @@ public:
 
         // Simple example: copy all channel data
         for (int ch = 0; ch < 3; ch++) {
-            std::vector<std::vector<std::complex<double>>> result(2*n);
-            for (int i = 0; i < n; i++) {
-                for (int j = 0; j < n; j++) {
+            std::vector<std::vector<std::complex<double>>> result(n);
+            for (int i = 0; i < n; i++)
+                for (int j = 0; j < n; j++)
                     result[i][j] = std::complex<double>(inputChunk[ch][i][j]);
-                    result[2*n-1-i][2*n-1-j] = std::complex<double>(inputChunk[ch][i][j]);
-                }
-            }
 
             for (int row = 0; row < n; row++)
                 ForwardFFT(result[row]);
 
 
-            for (int col = 0; col < 2*n; col++) {
-                std::vector<std::complex<double>> temp_col(2*n);
-                for (int i = 0; i < 2*n; i++)
+            for (int col = 0; col < n; col++) {
+                std::vector<std::complex<double>> temp_col;
+                for (int i = 0; i < n; i++)
                     temp_col[i] = result[i][col];
                 ForwardFFT(temp_col);
-                for (int i = 0; i < 2*n; i++)
+                for (int i = 0; i < n; i++)
                     result[i][col] = temp_col[i];
             }
 
-            double cu, cv;
-            double root_n = std::sqrt(n);
-            for(int i = 0; i < n; i++) {
-                for(int j = 0; j < n; j++) {
-                    if (i == 0) cu = 1 / root_n; else cu = std::sqrt(2) / root_n;
-                    if (j == 0) cv = 1 / root_n; else cv = std::sqrt(2) / root_n;
+            for(int i = 0; i < n; i++)
+                for(int j = 0; j < n; j++)
                     outputChunk[ch][i][j] = std::round(result[i][j].real());
-                }
-            }
         }
     }
     
     // Implement decodeChunk for DCT: n^4 implementation
     void decodeChunk(const Chunk& encodedChunk, Chunk& outputChunk) {
+        double sum, cu, cv;
+        int pixel;
         int n = encodedChunk.getChunkSize();
 
-        // Simple example: copy all channel data
+        // Simple example: copy all channel data back
         for (int ch = 0; ch < 3; ch++) {
-            std::vector<std::vector<std::complex<double>>> result(2*n);
             for (int i = 0; i < n; i++) {
                 for (int j = 0; j < n; j++) {
-                    result[i][j] = std::complex<double>(encodedChunk[ch][i][j]);
-                    result[2*n-1-i][2*n-1-j] = std::complex<double>(encodedChunk[ch][i][j]);
-                }
-            }
-
-            for (int row = 0; row < n; row++)
-                ForwardFFT(result[row]);
-
-
-            for (int col = 0; col < 2*n; col++) {
-                std::vector<std::complex<double>> temp_col(2*n);
-                for (int i = 0; i < 2*n; i++)
-                    temp_col[i] = result[i][col];
-                ForwardFFT(temp_col);
-                for (int i = 0; i < 2*n; i++)
-                    result[i][col] = temp_col[i];
-            }
-
-            double cu, cv;
-            double root_n = std::sqrt(n);
-            for(int i = 0; i < n; i++) {
-                for(int j = 0; j < n; j++) {
-                    if (i == 0) cu = 1 / root_n; else cu = std::sqrt(2) / root_n;
-                    if (j == 0) cv = 1 / root_n; else cv = std::sqrt(2) / root_n;
-                    outputChunk[ch][i][j] = std::round(result[i][j].real());
+                    sum = 0;
+                    for (int u = 0; u < n; u++) {
+                        for (int v = 0; v < n; v++) {
+                            if (u == 0) cu = 1 / std::sqrt(2); else cu = 1;
+                            if (v == 0) cv = 1 / std::sqrt(2); else cv = 1;
+                            pixel = encodedChunk[ch][u][v];
+                            sum += pixel * cu * cv * std::cos((PI * (2*i + 1) * u) / (2.0*n)) * std::cos((PI * (2*j + 1) * v) / (2.0*n));
+                        }
+                    }
+                    outputChunk[ch][i][j] = std::round((2.0 / n) * sum) + 128;
                 }
             }
         }
     }
 };
 
-#endif // DCT_TRANSFORM_HPP
+#endif // DFT_TRANSFORM_HPP
