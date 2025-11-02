@@ -41,7 +41,7 @@ def find_all_images() -> List[Tuple[str, str]]:
     
     return sorted(images)
 
-def parse_output(output: str) -> Tuple[float, float, float, float, float, float, float, float, float, float, float]:
+def parse_output(output: str) -> Tuple[float, float, float, float, float, float, float]:
     """
     Parse the output from simple_pipeline.
     Expected content includes a metrics tuple and optionally a Times line.
@@ -90,10 +90,17 @@ def parse_output(output: str) -> Tuple[float, float, float, float, float, float,
 
     # parse times line if present
     if times_line:
-        # Example: Times (ms): encode=12.34 quant=3.21 entropy_enc=0 entropy_dec=0 dequant=2.11 inverse=10.50
-        # extract key=value pairs
+        # Example: Times (ms): encode=12.34 decode=45.67
+        # Or old-style: Times (ms): encode=12.34 quant=3.21 entropy_enc=0 entropy_dec=0 dequant=2.11 inverse=10.50
         kvs = re.findall(r"([a-z_]+)=([0-9.+-eE]+)", times_line.replace('(', ' ').replace(')', ' '))
         kv = {k: float(v) for k, v in kvs}
+        # If 'encode' and 'decode' totals already present, use them
+        if 'encode' in kv and 'decode' in kv:
+            encode_total = kv.get('encode')
+            decode_total = kv.get('decode')
+            return (mse, psnr, original_entropy, transformed_entropy, quantized_entropy, encode_total, decode_total)
+
+        # otherwise try to pick apart detailed fields and sum
         encode_ms = kv.get('encode')
         quant_ms = kv.get('quant')
         entropy_enc_ms = kv.get('entropy_enc')
@@ -101,8 +108,13 @@ def parse_output(output: str) -> Tuple[float, float, float, float, float, float,
         dequant_ms = kv.get('dequant')
         inverse_ms = kv.get('inverse')
 
-    return (mse, psnr, original_entropy, transformed_entropy, quantized_entropy,
-            encode_ms, quant_ms, entropy_enc_ms, entropy_dec_ms, dequant_ms, inverse_ms)
+    # compute totals (treat missing as zero)
+    def zer(x):
+        return x if x is not None else 0.0
+
+    encode_total = zer(encode_ms) + zer(quant_ms) + zer(entropy_enc_ms)
+    decode_total = zer(entropy_dec_ms) + zer(dequant_ms) + zer(inverse_ms)
+    return (mse, psnr, original_entropy, transformed_entropy, quantized_entropy, encode_total, decode_total)
 
 def run_pipeline(transform: str, chunk_size: int, image_path: str) -> Dict:
     """
@@ -133,8 +145,7 @@ def run_pipeline(transform: str, chunk_size: int, image_path: str) -> Dict:
             }
         
         output = result.stdout.strip()
-        (mse, psnr, orig_ent, trans_ent, quant_ent,
-         encode_ms, quant_ms, entropy_enc_ms, entropy_dec_ms, dequant_ms, inverse_ms) = parse_output(output)
+        (mse, psnr, orig_ent, trans_ent, quant_ent, encode_total, decode_total) = parse_output(output)
 
         return {
             "dataset": Path(image_path).parent.name,
@@ -145,12 +156,8 @@ def run_pipeline(transform: str, chunk_size: int, image_path: str) -> Dict:
             "original_entropy": orig_ent,
             "transformed_entropy": trans_ent,
             "quantized_entropy": quant_ent,
-            "encode_ms": encode_ms,
-            "quant_ms": quant_ms,
-            "entropy_enc_ms": entropy_enc_ms,
-            "entropy_dec_ms": entropy_dec_ms,
-            "dequant_ms": dequant_ms,
-            "inverse_ms": inverse_ms,
+            "encode_ms": encode_total,
+            "decode_ms": decode_total,
             "error": None
         }
     except subprocess.TimeoutExpired:
@@ -251,10 +258,10 @@ def main():
         
         # Remove 'transform' field from results as it's redundant (file name indicates transform)
         fieldnames = ["dataset", "image_path", "mse", "psnr",
-                     "original_entropy", "transformed_entropy",
-                     "quantized_entropy",
-                     "encode_ms", "quant_ms", "entropy_enc_ms", "entropy_dec_ms", "dequant_ms", "inverse_ms",
-                     "error"]
+             "original_entropy", "transformed_entropy",
+             "quantized_entropy",
+             "encode_ms", "decode_ms",
+             "error"]
         # Ensure keys exist for all rows (use None when missing)
         csv_results = []
         for row in results:
@@ -280,11 +287,7 @@ def main():
         quant_ent_vals = [r["quantized_entropy"] for r in results if r["quantized_entropy"] is not None]
 
         encode_vals = [r["encode_ms"] for r in results if r.get("encode_ms") is not None]
-        quant_vals = [r["quant_ms"] for r in results if r.get("quant_ms") is not None]
-        entropy_enc_vals = [r["entropy_enc_ms"] for r in results if r.get("entropy_enc_ms") is not None]
-        entropy_dec_vals = [r["entropy_dec_ms"] for r in results if r.get("entropy_dec_ms") is not None]
-        dequant_vals = [r["dequant_ms"] for r in results if r.get("dequant_ms") is not None]
-        inverse_vals = [r["inverse_ms"] for r in results if r.get("inverse_ms") is not None]
+        decode_vals = [r["decode_ms"] for r in results if r.get("decode_ms") is not None]
 
         error_count = sum(1 for r in results if r["error"])
         total_count = len(results)
@@ -359,7 +362,7 @@ def main():
             "error": ""
         })
 
-        # Timing summaries
+        # Timing summary (encode / decode totals)
         summary_rows.append({
             "dataset": "SUMMARY",
             "image_path": "encode_ms",
@@ -369,97 +372,21 @@ def main():
             "transformed_entropy": "",
             "quantized_entropy": _fmt_stats(encode_vals),
             "encode_ms": "",
-            "quant_ms": "",
-            "entropy_enc_ms": "",
-            "entropy_dec_ms": "",
-            "dequant_ms": "",
-            "inverse_ms": "",
+            "decode_ms": "",
             "error": _fmt_stats(encode_vals)
         })
 
         summary_rows.append({
             "dataset": "SUMMARY",
-            "image_path": "quant_ms",
+            "image_path": "decode_ms",
             "mse": "",
             "psnr": "",
             "original_entropy": "",
             "transformed_entropy": "",
-            "quantized_entropy": _fmt_stats(quant_vals),
+            "quantized_entropy": _fmt_stats(decode_vals),
             "encode_ms": "",
-            "quant_ms": "",
-            "entropy_enc_ms": "",
-            "entropy_dec_ms": "",
-            "dequant_ms": "",
-            "inverse_ms": "",
-            "error": _fmt_stats(quant_vals)
-        })
-
-        summary_rows.append({
-            "dataset": "SUMMARY",
-            "image_path": "entropy_enc_ms",
-            "mse": "",
-            "psnr": "",
-            "original_entropy": "",
-            "transformed_entropy": "",
-            "quantized_entropy": _fmt_stats(entropy_enc_vals),
-            "encode_ms": "",
-            "quant_ms": "",
-            "entropy_enc_ms": "",
-            "entropy_dec_ms": "",
-            "dequant_ms": "",
-            "inverse_ms": "",
-            "error": _fmt_stats(entropy_enc_vals)
-        })
-
-        summary_rows.append({
-            "dataset": "SUMMARY",
-            "image_path": "entropy_dec_ms",
-            "mse": "",
-            "psnr": "",
-            "original_entropy": "",
-            "transformed_entropy": "",
-            "quantized_entropy": _fmt_stats(entropy_dec_vals),
-            "encode_ms": "",
-            "quant_ms": "",
-            "entropy_enc_ms": "",
-            "entropy_dec_ms": "",
-            "dequant_ms": "",
-            "inverse_ms": "",
-            "error": _fmt_stats(entropy_dec_vals)
-        })
-
-        summary_rows.append({
-            "dataset": "SUMMARY",
-            "image_path": "dequant_ms",
-            "mse": "",
-            "psnr": "",
-            "original_entropy": "",
-            "transformed_entropy": "",
-            "quantized_entropy": _fmt_stats(dequant_vals),
-            "encode_ms": "",
-            "quant_ms": "",
-            "entropy_enc_ms": "",
-            "entropy_dec_ms": "",
-            "dequant_ms": "",
-            "inverse_ms": "",
-            "error": _fmt_stats(dequant_vals)
-        })
-
-        summary_rows.append({
-            "dataset": "SUMMARY",
-            "image_path": "inverse_ms",
-            "mse": "",
-            "psnr": "",
-            "original_entropy": "",
-            "transformed_entropy": "",
-            "quantized_entropy": _fmt_stats(inverse_vals),
-            "encode_ms": "",
-            "quant_ms": "",
-            "entropy_enc_ms": "",
-            "entropy_dec_ms": "",
-            "dequant_ms": "",
-            "inverse_ms": "",
-            "error": _fmt_stats(inverse_vals)
+            "decode_ms": "",
+            "error": _fmt_stats(decode_vals)
         })
 
         # Append summary rows to the CSV data
