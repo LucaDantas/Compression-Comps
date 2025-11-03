@@ -1,34 +1,43 @@
 #ifndef HUFFMAN_HPP
 #define HUFFMAN_HPP
 
-#include <bits/stdc++.h>
-using namespace std;
+#include <optional>
+#include <string>
+#include <iostream>
+#include <map>
+#include <queue>
+#include <utility>
+#include <vector>
+#include <algorithm>
+#include <stdexcept>
+#include <functional>
+#include <cstddef>
 
 // Output of the encoding is a encoding of the tree and then a list of values for each leaf
 class HuffmanTree {
 private:
     struct Node {
-        optional<int> value;
+        std::optional<int> value;
         Node* left;
         Node* right;
         Node(int v) : value(v), left(nullptr), right(nullptr) {}
-        Node(Node* l, Node* r) : value(nullopt), left(l), right(r) {}
+        Node(Node* l, Node* r) : value(std::nullopt), left(l), right(r) {}
     } *root = nullptr;
 
-    void printTreeHelper(Node* node, string indent = "", bool isLeft = true) const {
+    void printTreeHelper(Node* node, std::string indent = "", bool isLeft = true) const {
         if (!node) return;
-        cerr << indent;
+        std::cerr << indent;
         if (isLeft) {
-            cerr << "├──";
+            std::cerr << "├──";
             indent += "│   ";
         } else {
-            cerr << "└──";
+            std::cerr << "└──";
             indent += "    ";
         }
         if (node->value.has_value()) {
-            cerr << node->value.value() << endl;
+            std::cerr << node->value.value() << std::endl;
         } else {
-            cerr << "[*]" << endl;
+            std::cerr << "[*]" << std::endl;
         }
         printTreeHelper(node->left, indent, true);
         printTreeHelper(node->right, indent, false);
@@ -42,16 +51,16 @@ private:
     }
 
 public:
-    HuffmanTree(const map<int, int>& freq) {
-        queue<pair<int, Node*>> characters, combinations;
+    HuffmanTree(const std::map<int, int>& freq) {
+        std::queue<std::pair<int, Node*>> characters, combinations;
         
-        auto getSortedFrequencies = [&freq]() -> vector<pair<int,int>> {
-            vector<pair<int,int>> result;
+        auto getSortedFrequencies = [&freq]() -> std::vector<std::pair<int,int>> {
+            std::vector<std::pair<int,int>> result;
             for (const auto& [value, frequency] : freq) {
                 result.emplace_back(value, frequency);
             }
-            sort(result.begin(), result.end(),
-                 [](const pair<int,int>& a, const pair<int,int>& b) {
+            std::sort(result.begin(), result.end(),
+                 [](const std::pair<int,int>& a, const std::pair<int,int>& b) {
                      return a.second < b.second;
                  });
             return result;
@@ -60,32 +69,32 @@ public:
         auto sortedFreq = getSortedFrequencies();
 
         if(sortedFreq.size() <= 1)
-            throw runtime_error("Input is either empty or only contains one type of integer value.");
+            throw std::runtime_error("Input is either empty or only contains one type of integer value.");
 
         for(auto& [val, f] : sortedFreq)
             characters.push({f, new Node(val)});
 
-        auto getSmallest = [&characters, &combinations]() -> pair<int, Node*> {
+        auto getSmallest = [&characters, &combinations]() -> std::pair<int, Node*> {
             if (characters.empty() && combinations.empty()) {
                 return {0, nullptr};
             }
             else if (characters.empty()) {
-                pair<int, Node*> p = combinations.front();
+                std::pair<int, Node*> p = combinations.front();
                 combinations.pop();
                 return p;
             }
             else if (combinations.empty()) {
-                pair<int, Node*> p = characters.front();
+                std::pair<int, Node*> p = characters.front();
                 characters.pop();
                 return p;
             }
             else {
                 if (characters.front().first <= combinations.front().first) {
-                    pair<int, Node*> p = characters.front();
+                    std::pair<int, Node*> p = characters.front();
                     characters.pop();
                     return p;
                 } else {
-                    pair<int, Node*> p = combinations.front();
+                    std::pair<int, Node*> p = combinations.front();
                     combinations.pop();
                     return p;
                 }
@@ -101,10 +110,10 @@ public:
         root = combinations.front().second;
     }
 
-    HuffmanTree(const vector<bool>& dfsPath, const vector<int>& leafValues) {
+    HuffmanTree(const std::vector<bool>& dfsPath, const std::vector<int>& leafValues) {
         int posDfs = 0, posLeaf = 0;
 
-        function<Node*(void)> buildTreeFromEncodingRecursive = [&]() -> Node* {
+        std::function<Node*(void)> buildTreeFromEncodingRecursive = [&]() -> Node* {
             if(dfsPath[posDfs++] == 0) { // internal node
                 Node* leftNode = buildTreeFromEncodingRecursive();
                 Node* rightNode = buildTreeFromEncodingRecursive();
@@ -123,16 +132,16 @@ public:
     }
 
     void printTree() const {
-        cerr << "\n--- Huffman Tree ---\n";
+        std::cerr << "\n--- Huffman Tree ---\n";
         printTreeHelper(root, "", false);
     }
 
-    map<int, string> getValueEncodings() {
-        map<int, string> result;
+    std::map<int, std::string> getValueEncodings() {
+        std::map<int, std::string> result;
         
-        function<void(Node*, string)> buildValueEncodingsRecursive = [&](Node* node, string path) -> void {
+        std::function<void(Node*, std::string)> buildValueEncodingsRecursive = [&](Node* node, std::string path) -> void {
             if (!node)
-                throw runtime_error("incorrect tree trying to be encoded, null non-leaf node found");
+                throw std::runtime_error("incorrect tree trying to be encoded, null non-leaf node found");
             if (node->value.has_value()) {
                 result[node->value.value()] = path;
                 return;
@@ -145,11 +154,11 @@ public:
         return result;
     }
 
-    pair<vector<bool>, vector<int>> getTreeEncoding() {
-        vector<bool> dfsPath;
-        vector<int> leafValues;
+    std::pair<std::vector<bool>, std::vector<int>> getTreeEncoding() {
+        std::vector<bool> dfsPath;
+        std::vector<int> leafValues;
         
-        function<void(Node*)> buildTreeEncodingRecursive = [&](Node* node) -> void {
+        std::function<void(Node*)> buildTreeEncodingRecursive = [&](Node* node) -> void {
             if (node->value.has_value()) {
                 dfsPath.push_back(1);
                 leafValues.push_back(node->value.value());
@@ -161,15 +170,15 @@ public:
         };
         
         buildTreeEncodingRecursive(root);
-        return make_pair(dfsPath, leafValues);
+        return std::make_pair(dfsPath, leafValues);
     }
 
-    vector<int> decodeBinaryString(const string& binaryString) const {
-        vector<int> result;
+    std::vector<int> decodeBinaryString(const std::string& binaryString) const {
+        std::vector<int> result;
         Node* current = root;
         
         if (!root) {
-            throw runtime_error("Cannot decode: tree is empty");
+            throw std::runtime_error("Cannot decode: tree is empty");
         }
         
         for (char bit : binaryString) {
@@ -178,11 +187,11 @@ public:
             } else if (bit == '1') {
                 current = current->right;
             } else {
-                throw runtime_error("Invalid character in binary string: only '0' and '1' allowed");
+                throw std::runtime_error("Invalid character in binary string: only '0' and '1' allowed");
             }
             
             if (!current) {
-                throw runtime_error("Invalid binary string: reached null node");
+                throw std::runtime_error("Invalid binary string: reached null node");
             }
             
             if (current->value.has_value()) {
@@ -192,7 +201,7 @@ public:
         }
         
         if (current != root) {
-            throw runtime_error("Invalid binary string: not all bits yielded complete symbols");
+            throw std::runtime_error("Invalid binary string: not all bits yielded complete symbols");
         }
         
         return result;
@@ -201,16 +210,16 @@ public:
 
 class HuffmanEncoder {
 private:
-    map<int, int> computeFrequencyMap(const vector<int>& values) const {
-        map<int, int> freq;
+    std::map<int, int> computeFrequencyMap(const std::vector<int>& values) const {
+        std::map<int, int> freq;
         for (int value : values) {
             freq[value]++;
         }
         return freq;
     }
 
-    vector<int> boolVectorToBitmask(const vector<bool>& boolVec) const {
-        vector<int> result;
+    std::vector<int> boolVectorToBitmask(const std::vector<bool>& boolVec) const {
+        std::vector<int> result;
         int currentInt = 0;
         int bitIndex = 0;
         
@@ -234,8 +243,8 @@ private:
         return result;
     }
 
-    vector<int> stringToBitmask(const string& bits) const {
-        vector<int> result;
+    std::vector<int> stringToBitmask(const std::string& bits) const {
+        std::vector<int> result;
         int currentInt = 0;
         int bitIndex = 0;
         
@@ -268,17 +277,17 @@ private:
 public:
     HuffmanEncoder() {}
 
-    vector<int> getEncoding(const vector<int>& values) const {
+    std::vector<int> getEncoding(const std::vector<int>& values) const {
         // Build Huffman tree and get encodings
         HuffmanTree tree(computeFrequencyMap(values));
-        map<int, string> encodingMap = tree.getValueEncodings();
-        pair<vector<bool>, vector<int>> treeEncoding = tree.getTreeEncoding();
+        std::map<int, std::string> encodingMap = tree.getValueEncodings();
+        std::pair<std::vector<bool>, std::vector<int>> treeEncoding = tree.getTreeEncoding();
         
-        vector<int> result;
+        std::vector<int> result;
         
         // Convert tree encoding dfsPath to bitmasks
-        const vector<bool>& dfsPath = treeEncoding.first;
-        vector<int> dfsPathBitmask = boolVectorToBitmask(dfsPath);
+        const std::vector<bool>& dfsPath = treeEncoding.first;
+        std::vector<int> dfsPathBitmask = boolVectorToBitmask(dfsPath);
         
         // Add size of tree encoding (number of ints needed for dfsPath)
         result.push_back(dfsPathBitmask.size());
@@ -290,11 +299,11 @@ public:
         result.insert(result.end(), treeEncoding.second.begin(), treeEncoding.second.end());
         
         // Get text encoding string and convert to bitmasks
-        string textEncodingString;
+        std::string textEncodingString;
         for (int value : values) {
             textEncodingString += encodingMap.at(value);
         }
-        vector<int> textBitmask = stringToBitmask(textEncodingString);
+        std::vector<int> textBitmask = stringToBitmask(textEncodingString);
         result.insert(result.end(), textBitmask.begin(), textBitmask.end());
         
         return result;
@@ -303,8 +312,8 @@ public:
 
 class HuffmanDecoder {
 private:
-    vector<bool> bitmaskToBoolVector(const vector<int>& bitmasks) const {
-        vector<bool> result;
+    std::vector<bool> bitmaskToBoolVector(const std::vector<int>& bitmasks) const {
+        std::vector<bool> result;
         
         for (int mask : bitmasks) {
             for (int i = 31; i >= 0; i--) {
@@ -315,12 +324,12 @@ private:
         return result;
     }
 
-    string bitmaskToString(const vector<int>& bitmasks, int emptyBitsInLastInt = 0) const {
+    std::string bitmaskToString(const std::vector<int>& bitmasks, int emptyBitsInLastInt = 0) const {
         if (bitmasks.empty()) {
             return "";
         }
         
-        string result;
+        std::string result;
         
         // Process all but the last int (full 32 bits each)
         for (size_t i = 0; i < bitmasks.size() - 1; i++) {
@@ -345,9 +354,9 @@ private:
 public:
     HuffmanDecoder() {}
 
-    vector<int> decode(const vector<int>& encoded) const {
+    std::vector<int> decode(const std::vector<int>& encoded) const {
         if (encoded.empty()) {
-            throw runtime_error("Encoded data is empty");
+            throw std::runtime_error("Encoded data is empty");
         }
         
         size_t index = 0;
@@ -356,17 +365,17 @@ public:
         int dfsPathBitmaskSize = encoded[index++];
         
         if (dfsPathBitmaskSize < 0 || index + dfsPathBitmaskSize > encoded.size()) {
-            throw runtime_error("Invalid dfsPath bitmask size");
+            throw std::runtime_error("Invalid dfsPath bitmask size");
         }
         
         // Read the dfsPath bitmasks
-        vector<int> dfsPathBitmasks;
+        std::vector<int> dfsPathBitmasks;
         for (int i = 0; i < dfsPathBitmaskSize; i++) {
             dfsPathBitmasks.push_back(encoded[index++]);
         }
         
         // Convert bitmasks back to vector<bool>
-        vector<bool> dfsPath = bitmaskToBoolVector(dfsPathBitmasks);
+        std::vector<bool> dfsPath = bitmaskToBoolVector(dfsPathBitmasks);
         
         // Remove trailing zeros until the last 1
         while (!dfsPath.empty() && dfsPath.back() == false) {
@@ -374,7 +383,7 @@ public:
         }
         
         if (dfsPath.empty()) {
-            throw runtime_error("Invalid dfsPath: no bits found");
+            throw std::runtime_error("Invalid dfsPath: no bits found");
         }
         
         // Count the number of 1s in dfsPath
@@ -387,10 +396,10 @@ public:
         
         // Read that many leaf values
         if (index + numOnes > encoded.size()) {
-            throw runtime_error("Not enough data for leaf values");
+            throw std::runtime_error("Not enough data for leaf values");
         }
         
-        vector<int> leafValues;
+        std::vector<int> leafValues;
         for (int i = 0; i < numOnes; i++) {
             leafValues.push_back(encoded[index++]);
         }
@@ -401,20 +410,20 @@ public:
         // Get the remaining encoded data (text encoding bitmasks)
         // The last element is the number of empty bits in the last int
         if (index >= encoded.size() - 1) {
-            throw runtime_error("Not enough data for text encoding bitmasks");
+            throw std::runtime_error("Not enough data for text encoding bitmasks");
         }
         
         // Extract text bitmasks (all but the last element which is the padding count)
-        vector<int> textBitmasks(encoded.begin() + index, encoded.end() - 1);
+        std::vector<int> textBitmasks(encoded.begin() + index, encoded.end() - 1);
         int emptyBitsInLastInt = encoded.back();
         
         // Validate empty bits count
         if (emptyBitsInLastInt < 0 || emptyBitsInLastInt > 32) {
-            throw runtime_error("Invalid empty bits count in last int");
+            throw std::runtime_error("Invalid empty bits count in last int");
         }
         
         // Convert bitmasks to binary string
-        string binaryString = bitmaskToString(textBitmasks, emptyBitsInLastInt);
+        std::string binaryString = bitmaskToString(textBitmasks, emptyBitsInLastInt);
         
         // Decode using the tree
         return tree.decodeBinaryString(binaryString);
