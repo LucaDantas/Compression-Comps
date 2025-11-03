@@ -172,7 +172,7 @@ public:
                 InverseFCT(result[row]);
 
 
-            for (int col = 0; col < 2*n; col++) {
+            for (int col = 0; col < n; col++) {
                 std::vector<double> temp_col(n);
                 for (int i = 0; i < n; i++)
                     temp_col[i] = result[i][col];
