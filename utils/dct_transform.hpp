@@ -3,16 +3,18 @@
 
 #include <cmath>
 #include <complex>
+#include <vector>
+#include <iostream>
 #include "image_lib.hpp"
 
 // Implementation of DCT Transform using the FFT algorithm.
-class DFTTransform : public Transform {
+class DCTTransform : public Transform {
 private:
     const double PI = std::acos(-1.0);
     const double RT2 = std::sqrt(2);
 public:
     // Constructor specifies DCT transform space
-    DFTTransform() : Transform(TransformSpace::DCT) {}
+    DCTTransform() : Transform(TransformSpace::DCT) {}
 
     // Reverse the bits of a number, up to the maximum range numb_bits
     int reverse(int num, int num_bits) {
@@ -86,8 +88,8 @@ public:
         }
         ForwardFFT(mirrored_data);
         double theta = -PI / (2*n);
-        double scale = 1 / (std::sqrt(2*n));
-        std::complex<double> w(std::cos(theta), std::sin(theta));
+        double scale = 2 * RT2 / (std::sqrt(n));
+        std::complex<double> w(std::cos(theta), -std::sin(theta));
         std::complex<double> w_n(1);
         for (int i = 0; i < n; i++) {
             data[i] = (scale * ((i == 0) ? 1 / RT2 : 1) * w_n * mirrored_data[i]).real();
@@ -97,19 +99,24 @@ public:
 
     void InverseFCT(std::vector<double>& data) {
         int n = data.size();
+        double theta = PI / (2*n);
+        double scale = std::sqrt(n) / (2 * RT2);
         std::vector<std::complex<double>> mirrored_data(2*n);
         for (int i = 0; i < n; i++) {
+            data[i] *= scale * ((i == 0) ? RT2: 1);
             mirrored_data[i] = std::complex<double>(data[i]);
-            mirrored_data[2*n-1-i] = std::complex<double>(data[i]);
+            if (i > 0) mirrored_data[2*n - i] = std::complex<double>(-data[i]);
+        }
+        mirrored_data[n] = 0;
+        std::complex<double> w(std::cos(theta), -std::sin(theta));
+        std::complex<double> w_n(1);
+        for (int i = 0; i < 2*n; i++) {
+            mirrored_data[i] *= w_n;
+            w_n *= w;
         }
         InverseFFT(mirrored_data);
-        double theta = -PI / (2*n);
-        double scale = 1 / (std::sqrt(2*n));
-        std::complex<double> w(std::cos(theta), std::sin(theta));
-        std::complex<double> w_n(1);
         for (int i = 0; i < n; i++) {
-            data[i] = (scale * ((i == 0) ? 1 / RT2 : 1) * w_n * mirrored_data[i]).real();
-            w_n *= w;
+            data[i] = mirrored_data[i].real();
         }
     }
 
@@ -120,34 +127,29 @@ public:
 
         // Simple example: copy all channel data
         for (int ch = 0; ch < 3; ch++) {
-            std::vector<std::vector<std::complex<double>>> result(2*n);
+            std::vector<std::vector<double>> result(n, std::vector<double>(n));
             for (int i = 0; i < n; i++) {
                 for (int j = 0; j < n; j++) {
-                    result[i][j] = std::complex<double>(inputChunk[ch][i][j]);
-                    result[2*n-1-i][2*n-1-j] = std::complex<double>(inputChunk[ch][i][j]);
+                    result[i][j] = (double)inputChunk[ch][i][j] - 128;
                 }
             }
 
             for (int row = 0; row < n; row++)
-                ForwardFFT(result[row]);
+                ForwardFCT(result[row]);
 
 
-            for (int col = 0; col < 2*n; col++) {
-                std::vector<std::complex<double>> temp_col(2*n);
-                for (int i = 0; i < 2*n; i++)
+            for (int col = 0; col < n; col++) {
+                std::vector<double> temp_col(n);
+                for (int i = 0; i < n; i++)
                     temp_col[i] = result[i][col];
-                ForwardFFT(temp_col);
-                for (int i = 0; i < 2*n; i++)
+                ForwardFCT(temp_col);
+                for (int i = 0; i < n; i++)
                     result[i][col] = temp_col[i];
             }
 
-            double cu, cv;
-            double root_n = std::sqrt(n);
             for(int i = 0; i < n; i++) {
                 for(int j = 0; j < n; j++) {
-                    if (i == 0) cu = 1 / root_n; else cu = std::sqrt(2) / root_n;
-                    if (j == 0) cv = 1 / root_n; else cv = std::sqrt(2) / root_n;
-                    outputChunk[ch][i][j] = std::round(result[i][j].real());
+                    outputChunk[ch][i][j] = std::round(result[i][j]);
                 }
             }
         }
@@ -159,34 +161,29 @@ public:
 
         // Simple example: copy all channel data
         for (int ch = 0; ch < 3; ch++) {
-            std::vector<std::vector<std::complex<double>>> result(2*n);
+            std::vector<std::vector<double>> result(n, std::vector<double>(n));
             for (int i = 0; i < n; i++) {
                 for (int j = 0; j < n; j++) {
-                    result[i][j] = std::complex<double>(encodedChunk[ch][i][j]);
-                    result[2*n-1-i][2*n-1-j] = std::complex<double>(encodedChunk[ch][i][j]);
+                    result[i][j] = (double)encodedChunk[ch][i][j];
                 }
             }
 
             for (int row = 0; row < n; row++)
-                ForwardFFT(result[row]);
+                InverseFCT(result[row]);
 
 
             for (int col = 0; col < 2*n; col++) {
-                std::vector<std::complex<double>> temp_col(2*n);
-                for (int i = 0; i < 2*n; i++)
+                std::vector<double> temp_col(n);
+                for (int i = 0; i < n; i++)
                     temp_col[i] = result[i][col];
-                ForwardFFT(temp_col);
-                for (int i = 0; i < 2*n; i++)
+                InverseFCT(temp_col);
+                for (int i = 0; i < n; i++)
                     result[i][col] = temp_col[i];
             }
 
-            double cu, cv;
-            double root_n = std::sqrt(n);
             for(int i = 0; i < n; i++) {
                 for(int j = 0; j < n; j++) {
-                    if (i == 0) cu = 1 / root_n; else cu = std::sqrt(2) / root_n;
-                    if (j == 0) cv = 1 / root_n; else cv = std::sqrt(2) / root_n;
-                    outputChunk[ch][i][j] = std::round(result[i][j].real());
+                    outputChunk[ch][i][j] = std::round(result[i][j]) + 128;
                 }
             }
         }
