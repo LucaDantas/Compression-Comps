@@ -239,16 +239,6 @@ public:
             return false;
         }
         
-        // Check if the image is in Raw transform space
-        // COMMENTED OUT FOR NOW - allow saving any transform space
-        /*
-        if (transformSpace != TransformSpace::Raw) {
-            std::cerr << "Error: Image must be in Raw transform space to save as PNG. Current transform space: " 
-                      << transformSpaceToString(transformSpace) << std::endl;
-            return false;
-        }
-        */
-        
         // Convert pixel data to flat RGB array for STB with clamping
         std::vector<unsigned char> rgbData(rows * columns * 3);
         int idx = 0;
@@ -282,15 +272,6 @@ public:
             return false;
         }
         
-        // Check if the image is in Raw transform space
-        // COMMENTED OUT FOR NOW - allow saving any transform space
-        /*
-        if (transformSpace != TransformSpace::Raw) {
-            std::cerr << "Error: Image must be in Raw transform space to save channel as BW. Current transform space: " 
-                      << transformSpaceToString(transformSpace) << std::endl;
-            return false;
-        }
-        */
         
         // Validate channel index
         if (channel < 0 || channel >= 3) {
@@ -336,6 +317,68 @@ public:
         
         return allSuccess;
     }
+    
+    // Write image metadata and pixel data to a vector<int>
+    // Format: [rows, columns, transformSpace, colorSpace, pixel_data...]
+    // Pixel data is stored row by row, column by column, channel by channel
+    std::vector<int> writeToVector() const {
+        std::vector<int> result;
+        
+        // Reserve space: 4 metadata values + rows * columns * 3 pixel values
+        result.reserve(4 + rows * columns * 3);
+        
+        // Write metadata
+        result.push_back(rows);
+        result.push_back(columns);
+        result.push_back(static_cast<int>(transformSpace));
+        result.push_back(static_cast<int>(colorSpace));
+        
+        // Write pixel data: row by row, column by column, channel by channel
+        for (int row = 0; row < rows; row++) {
+            for (int col = 0; col < columns; col++) {
+                result.push_back(pixels[row][col][0]);
+                result.push_back(pixels[row][col][1]);
+                result.push_back(pixels[row][col][2]);
+            }
+        }
+        
+        return result;
+    }
+    
+    // Constructor that reconstructs Image from vector<int> format
+    // Format: [rows, columns, transformSpace, colorSpace, pixel_data...]
+    Image(const std::vector<int>& data) {
+        // Check minimum size (at least 4 metadata values)
+        if (data.size() < 4) {
+            throw std::runtime_error("Invalid vector data: insufficient size for metadata");
+        }
+        
+        // Read metadata
+        rows = data[0];
+        columns = data[1];
+        transformSpace = static_cast<TransformSpace>(data[2]);
+        colorSpace = static_cast<ColorSpace>(data[3]);
+        
+        // Check if we have enough data for all pixels
+        int expectedSize = 4 + rows * columns * 3;
+        if (data.size() < expectedSize) {
+            throw std::runtime_error("Invalid vector data: insufficient size for pixel data. Expected " + 
+                                   std::to_string(expectedSize) + " elements, got " + std::to_string(data.size()));
+        }
+        
+        // Resize pixel array
+        pixels.resize(rows, std::vector<Pixel>(columns));
+        
+        // Read pixel data: row by row, column by column, channel by channel
+        int idx = 4; // Start after metadata
+        for (int row = 0; row < rows; row++) {
+            for (int col = 0; col < columns; col++) {
+                pixels[row][col][0] = data[idx++];
+                pixels[row][col][1] = data[idx++];
+                pixels[row][col][2] = data[idx++];
+            }
+        }
+    }
 };
 
 // Function to compute pixel-wise difference between two images
@@ -349,14 +392,6 @@ Image imageDiff(const Image& img1, const Image& img2, int scale = 100) {
     if (img1.getColorSpace() != img2.getColorSpace()) {
         throw std::runtime_error("Images must be in the same color space for difference computation");
     }
-    
-    // Check if both images are in Raw transform space
-    // COMMENTED OUT FOR NOW - allow difference computation for any transform space
-    /*
-    if (img1.getTransformSpace() != TransformSpace::Raw || img2.getTransformSpace() != TransformSpace::Raw) {
-        throw std::runtime_error("Both images must be in Raw transform space for difference computation");
-    }
-    */
     
     // Create result image with same dimensions and properties as input images
     Image result = img1; // Copy constructor to get same dimensions and properties
