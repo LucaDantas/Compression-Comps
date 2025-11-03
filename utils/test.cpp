@@ -173,6 +173,52 @@ void decodeChunk(const std::vector<std::vector<int>>& inputChunk, std::vector<st
         }
     }
 
+
+void encodeChunk2(const std::vector<std::vector<int>>& inputChunk, std::vector<std::vector<int>>& outputChunk) {
+    double sum, cu, cv;
+    int pixel;
+    int n = inputChunk.size();
+
+    // Simple example: copy all channel data
+    for (int u = 0; u < n; u++) {
+        for (int v = 0; v < n; v++) {
+            sum = 0;
+            if (u == 0) cu = 1 / std::sqrt(2); else cu = 1;
+            if (v == 0) cv = 1 / std::sqrt(2); else cv = 1;
+            for (int i = 0; i < n; i++) {
+                for (int j = 0; j < n; j++) {
+                    pixel = inputChunk[i][j] - 128;
+                    sum += pixel * std::cos((PI * (2*i + 1) * u) / (2.0*n)) * std::cos((PI * (2*j + 1) * v) / (2.0*n));
+                }
+            }
+            outputChunk[u][v] = std::round((2.0 / n) * cu * cv * sum);
+        }
+    }
+}
+
+// Implement decodeChunk for DCT: n^4 implementation
+void decodeChunk2(const std::vector<std::vector<int>>& inputChunk, std::vector<std::vector<int>>& outputChunk) {
+    double sum, cu, cv;
+    int pixel;
+    int n = inputChunk.size();
+
+    // Simple example: copy all channel data back
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            sum = 0;
+            for (int u = 0; u < n; u++) {
+                for (int v = 0; v < n; v++) {
+                    if (u == 0) cu = 1 / std::sqrt(2); else cu = 1;
+                    if (v == 0) cv = 1 / std::sqrt(2); else cv = 1;
+                    pixel = inputChunk[u][v];
+                    sum += pixel * cu * cv * std::cos((PI * (2*i + 1) * u) / (2.0*n)) * std::cos((PI * (2*j + 1) * v) / (2.0*n));
+                }
+            }
+            outputChunk[i][j] = std::round((2.0 / n) * sum) + 128;
+        }
+    }
+}
+
 int main() {
     // Define dimensions of the 2D vector
     const int numRows = 8;
@@ -209,11 +255,20 @@ int main() {
     }
 
     std::vector<std::vector<int>> fct_test(8, std::vector<int>(8));
+    std::vector<std::vector<int>> dct_test(8, std::vector<int>(8));
     encodeChunk(random2DVector, fct_test);
+    encodeChunk2(random2DVector, dct_test);
     std::cout << "FCT Transformed Chunk:" << std::endl;
     for (int i = 0; i < numRows; ++i) {
         for (int j = 0; j < numCols; ++j) {
             std::cout << fct_test[i][j] << "\t";
+        }
+        std::cout << std::endl;
+    }
+    std::cout << "DCT Transformed Chunk:" << std::endl;
+    for (int i = 0; i < numRows; ++i) {
+        for (int j = 0; j < numCols; ++j) {
+            std::cout << dct_test[i][j] << "\t";
         }
         std::cout << std::endl;
     }
@@ -225,7 +280,14 @@ int main() {
         }
         std::cout << std::endl;
     }
-
+    decodeChunk(dct_test, random2DVector);
+    std::cout << "DCT Reverted Chunk:" << std::endl;
+    for (int i = 0; i < numRows; ++i) {
+        for (int j = 0; j < numCols; ++j) {
+            std::cout << random2DVector[i][j] << "\t";
+        }
+        std::cout << std::endl;
+    }
     std::vector<double> test(8);
     std::cout << "Test vector:" << std::endl;
     for (int i = 0; i < numRows; i++) {
