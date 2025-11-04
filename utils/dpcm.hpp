@@ -88,8 +88,8 @@ int *zigzagFlattenArray(int **arr, int size) {
 	
 	int *flat = (int *)malloc(sizeof(int)*size*size);
 	
-	for (int rep = -7; rep < 8; rep++) {
-		ste = 7 - abs(rep);
+	for (int rep = -(size-1); rep < size; rep++) {
+		ste = (size-1) - abs(rep);
 		
 		while (ste >= 0) {
 			flat[k] = arr[i][j];
@@ -131,8 +131,8 @@ int *zigzagFlattenArray(const std::vector<int> *arr, int size) {
 	
 	int *flat = (int *)malloc(sizeof(int)*size*size);
 	
-	for (int rep = -7; rep < 8; rep++) {
-		ste = 7 - abs(rep);
+	for (int rep = -(size-1); rep < size; rep++) {
+		ste = (size-1) - abs(rep);
 		
 		while (ste >= 0) {
 			flat[k] = arr[i][j];
@@ -174,8 +174,8 @@ std::vector<std::vector<int>> unflattenArray(const std::vector<int>& arr, int si
 	
 	std::vector<std::vector<int>> chunk(size, std::vector<int>(size, 0));
 
-	for (int rep = -7; rep < 8; rep++) {
-		ste = 7 - abs(rep);
+	for (int rep = -(size-1); rep < size; rep++) {
+		ste = (size-1) - abs(rep);
 		
 		while (ste >= 0) {
 			chunk[i][j] = arr[k];
