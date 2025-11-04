@@ -579,7 +579,7 @@ protected:
     virtual void encodeChunk(const Chunk& inputChunk, Chunk& outputChunk) = 0;
     virtual void decodeChunk(const Chunk& encodedChunk, Chunk& outputChunk) = 0;
 	
-	virtual std::vector<std::vector<int>> getQuantizationMatrix() {
+	virtual std::vector<std::vector<int>> getQuantizationMatrix(int size) {
 		
 		std::vector<std::vector<int>> quantizationMatrix = { {16, 11, 10, 16, 24, 40, 51, 61},
 																 {12, 12, 14, 19, 26, 58, 60, 55},
@@ -605,7 +605,7 @@ protected:
 			for (int u = 0; u < size; u++) {
 				for (int v = 0; v < size; v++) {
 					inputValue = inputChunk[ch][u][v];
-					matrixValue = getQuantizationMatrix()[u][v];
+					matrixValue = getQuantizationMatrix(size)[u][v];
 					result = std::round(inputValue / matrixValue);
 					outputChunk[ch][u][v] = result;
 				}
@@ -623,7 +623,7 @@ protected:
 			for (int u = 0; u < size; u++) {
 				for (int v = 0; v < size; v++) {
 					encodedValue = encodedChunk[ch][u][v];
-					matrixValue = getQuantizationMatrix()[u][v];
+					matrixValue = getQuantizationMatrix(size)[u][v];
 					result = encodedValue * matrixValue;
 					outputChunk[ch][u][v] = result;
 				}
