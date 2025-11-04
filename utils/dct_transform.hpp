@@ -71,6 +71,7 @@ public:
             x /= std::sqrt(n);
     }
 
+    // Formal forward and inverse functions so invert parameter doesn't have to be passed.
     void ForwardFFT(std::vector<std::complex<double>>& data) {
         FFT(data, 0);
     }
@@ -79,14 +80,18 @@ public:
         FFT(data, 1);
     }
 
+    // Apply the 1D DCT to a vector using FFT on a mirrored copy of the data. This is
+    // known as Malhouf's algorithm for DCT.
     void ForwardFCT(std::vector<double>& data) {
         int n = data.size();
+        // Mirror the data and run FFT
         std::vector<std::complex<double>> mirrored_data(2*n);
         for (int i = 0; i < n; i++) {
             mirrored_data[i] = std::complex<double>(data[i]);
             mirrored_data[2*n-1-i] = mirrored_data[i];
         }
         ForwardFFT(mirrored_data);
+        // Apply a phase shift to the data so that it is real-valued and normalize
         double theta = -PI / (2*n);
         double scale = 2 * RT2 / (std::sqrt(n));
         std::complex<double> w(std::cos(theta), -std::sin(theta));
@@ -97,8 +102,11 @@ public:
         }
     }
 
+    // Inverts the process of the forward FCT.
     void InverseFCT(std::vector<double>& data) {
         int n = data.size();
+        // Use the symmetry of the mirrored FFT coefficients to retrieve all
+        // 2N of them, and invert normalization
         double theta = PI / (2*n);
         double scale = std::sqrt(n) / (2 * RT2);
         std::vector<std::complex<double>> mirrored_data(2*n);
@@ -107,6 +115,7 @@ public:
             mirrored_data[i] = std::complex<double>(data[i]);
             if (i > 0) mirrored_data[2*n - i] = std::complex<double>(-data[i]);
         }
+        // Shift data back then invert the FFT
         mirrored_data[n] = 0;
         std::complex<double> w(std::cos(theta), -std::sin(theta));
         std::complex<double> w_n(1);
