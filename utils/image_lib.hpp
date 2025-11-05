@@ -684,46 +684,33 @@ public:
     }
 	
 	ChunkedImage applyQuantization(const ChunkedImage& chunkedImage) {
-		
-		// Check that the chunk size is 8x8
-        if (chunkedImage.getChunkSize() != 8) {
-            throw std::runtime_error(
-                "ChunkedImage chunk size (" + std::to_string(chunkedImage.getChunkSize()) + 
-                ") is not 8. Default quantizer currently only supports 8x8 chunks."
-            );
-        }
-		
+        // Allow quantization for any chunk size; concrete Transform implementations
+        // are responsible for supporting the provided chunk dimensions.
         ChunkedImage result = chunkedImage.createFreshCopyForTransformResult(transformSpace);
-		
-        // Apply decoding to each chunk
+
+        // Apply quantization to each chunk
         for (int i = 0; i < result.getTotalChunks(); i++) {
             const Chunk& inputChunk = chunkedImage.getChunkAt(i);
             Chunk& resultChunk = result.getChunkAt(i);
             quantizeChunk(inputChunk, resultChunk);
         }
-        
+
         return result;
 
 	}
 	
 	ChunkedImage applyInverseQuantization(const ChunkedImage& chunkedImage) {
-		
-        if (chunkedImage.getChunkSize() != 8) {
-            throw std::runtime_error(
-                "ChunkedImage chunk size (" + std::to_string(chunkedImage.getChunkSize()) + 
-                ") is not 8. Default quantizer currently only supports 8x8 chunks."
-            );
-        }
-		
+        // Allow inverse-quantization for any chunk size; concrete Transform implementations
+        // are responsible for supporting the provided chunk dimensions.
         ChunkedImage result = chunkedImage.createFreshCopyForTransformResult(transformSpace);
-		
-        // Apply decoding to each chunk
+
+        // Apply inverse quantization to each chunk
         for (int i = 0; i < result.getTotalChunks(); i++) {
             const Chunk& inputChunk = chunkedImage.getChunkAt(i);
             Chunk& resultChunk = result.getChunkAt(i);
             dequantizeChunk(inputChunk, resultChunk);
         }
-        
+
         return result;
 
 	}
