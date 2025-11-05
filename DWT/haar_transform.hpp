@@ -6,49 +6,19 @@
 
 // Example implementation: DCT Transform
 class HaarTransform : public Transform {
-private:
-    // decreasing this number decreases the precision of the transform
-    // but increases the entropy reduction (lossy)
-    double transformScale;
-    double detailScale;
-	
-	std::vector<std::vector<int>> getQuantizationMatrix(int size) {
-		
-		std::vector<std::vector<int>> quantizationMatrix(size, std::vector<int>(size, 1));
-		
-		int recursions = std::log2(size);
-		
-		for (int r = 0; r < recursions; r++) {
-		
-			for (int i = 0; i < (size/std::pow(2, r)); i++) {
-				for (int j = 0; j < (size/std::pow(2, r)); j++) {
-					if (i >= (size/std::pow(2, r+1)) || j >= (size/std::pow(2, r+1)) ) {
-						quantizationMatrix[i][j] = quantizationMatrix[i][j]*std::pow(2, r+1);
-					}
-				}
-			}
-		
-		}
-		
-		quantizationMatrix[0][0] = quantizationMatrix[0][0]*std::pow(2, recursions);
-
-		return quantizationMatrix;
-		
-	}
-	
 public:
     // Constructor specifies transform space
-    HaarTransform(double transformScale = 0.125, double detailScale = 1)
-        : Transform(TransformSpace::Haar), transformScale(transformScale), detailScale(detailScale) {}
+    HaarTransform()
+        : Transform(TransformSpace::Haar) {}
 
     // applies one haar transformation on the first n values
-    void applyHaar1DIteration(std::vector<double>& data, int n) {
+    void applyHaar1DIteration(std::vector<int>& data, int n) {
         assert(n % 2 == 0 && n <= (int)data.size());
 
-        std::vector<double> result(n);
+        std::vector<int> result(n);
         for (int i = 0; i < n/2; i++) {
-            result[i] = (data[2*i] + data[2*i + 1]) / std::sqrt(2);
-            result[i + n/2] = (data[2*i] - data[2*i + 1]) * detailScale / std::sqrt(2);
+            result[i] = data[2*i] + data[2*i + 1];
+            result[i + n/2] = data[2*i] - data[2*i + 1];
         }
         for(int i = 0; i < n; i++)
             data[i] = result[i];
@@ -56,13 +26,13 @@ public:
 
     // applies the inverse transform to the first n values 
     // (first half is average, second half is detail coeff)
-    void inverseHaar1DIteration(std::vector<double>& data, int n) {
+    void inverseHaar1DIteration(std::vector<int>& data, int n) {
         assert(n % 2 == 0 && n <= (int)data.size());
 
-        std::vector<double> result(n);
+        std::vector<int> result(n);
         for (int i = 0; i < n/2; i++) {
-            result[2*i] = (data[i] + data[i + n/2] / detailScale) / std::sqrt(2);
-            result[2*i+1] = (data[i] - data[i + n/2] / detailScale) / std::sqrt(2);
+            result[2*i] = (data[i] + data[i + n/2]) / 2;
+            result[2*i+1] = (data[i] - data[i + n/2]) / 2;
         }
         for(int i = 0; i < n; i++)
             data[i] = result[i];
@@ -71,10 +41,10 @@ public:
     void nonStandardDecomposition(Chunk& outputChunk) {
         for(int ch = 0; ch < 3; ch++) {
             int n = (int)outputChunk.getChunkSize();
-            std::vector<std::vector<double>> result(n, std::vector<double>(n));
+            std::vector<std::vector<int>> result(n, std::vector<int>(n));
             for(int i = 0; i < n; i++)
                 for(int j = 0; j < n; j++)
-                    result[i][j] = outputChunk[ch][i][j] * transformScale;
+                    result[i][j] = outputChunk[ch][i][j];
 
             for(int sz = n; sz > 1; sz /= 2) {
                 // apply a transformation to the rows
@@ -83,7 +53,7 @@ public:
                 
                 // apply a transformation to the columns
                 for(int col = 0; col < sz; col++) {
-                    std::vector<double> data(sz);
+                    std::vector<int> data(sz);
                     for(int i = 0; i < sz; i++)
                         data[i] = result[i][col];
                     applyHaar1DIteration(data, sz);
@@ -94,14 +64,14 @@ public:
 
             for(int i = 0; i < n; i++)
                 for(int j = 0; j < n; j++)
-                    outputChunk[ch][i][j] = round(result[i][j]);
+                    outputChunk[ch][i][j] = result[i][j];
         }
     }
 
     void inverseNonStandardDecomposition(Chunk& outputChunk) {
         for(int ch = 0; ch < 3; ch++) {
             int n = (int)outputChunk.getChunkSize();
-            std::vector<std::vector<double>> result(n, std::vector<double>(n));
+            std::vector<std::vector<int>> result(n, std::vector<int>(n));
             for(int i = 0; i < n; i++)
                 for(int j = 0; j < n; j++)
                     result[i][j] = outputChunk[ch][i][j];
@@ -109,7 +79,7 @@ public:
             for(int sz = 2; sz <= n; sz *= 2) {
                 // in the inverse first apply to column and then to row
                 for(int col = 0; col < sz; col++) {
-                    std::vector<double> data(sz);
+                    std::vector<int> data(sz);
                     for(int i = 0; i < sz; i++)
                         data[i] = result[i][col];
                     inverseHaar1DIteration(data, sz);
@@ -123,8 +93,20 @@ public:
             }
             for(int i = 0; i < n; i++)
                 for(int j = 0; j < n; j++)
-                    outputChunk[ch][i][j] = round(result[i][j] / transformScale);
+                    outputChunk[ch][i][j] = result[i][j];
         }
+    }
+    
+    std::vector<std::vector<int>> getQuantizationMatrix(int size) {
+        // size must be a power of 2
+        std::vector<std::vector<int>> quantizationMatrix(size, std::vector<int>(size, 1));
+        
+        for (int sz = 1; sz <= size; sz <<= 1)
+            for (int i = 0; i < sz; i++)
+                for (int j = 0; j < sz; j++)
+                    quantizationMatrix[i][j] <<= 1;
+
+        return quantizationMatrix;
     }
 
     void encodeChunk(const Chunk& inputChunk, Chunk& outputChunk) {
@@ -139,4 +121,3 @@ public:
 };
 
 #endif // HAAR_TRANSFORM_HPP
-
