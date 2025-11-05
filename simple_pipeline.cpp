@@ -5,11 +5,13 @@
 #include "utils/image_lib.hpp"
 #include "utils/dct_transform.hpp"
 #include "utils/sp_transform.hpp"
+#include "utils/dft_transform.hpp"
 #include "DWT/haar_transform.hpp"
 #include "utils/entropy.hpp"
 #include "utils/dpcm.hpp"
 #include "utils/rle.hpp"
 #include "utils/metrics.cpp"
+#include "utils/timer.hpp"
 
 int main(int argc, char* argv[]) {
     // Check command line arguments
@@ -45,47 +47,73 @@ int main(int argc, char* argv[]) {
         transform = new SPTransform();
     } else if (transformName == "HAAR") {
         transform = new HaarTransform();
+    } else if (transformName == "DFT") {
+        transform = new DFTTransform();
+        img.convertToGrayscale();
     }
     
-    ChunkedImage transformedImg = transform->applyTransform(chunkedImg);
+    // Measure transform encode time
+    ChunkedImage transformedImg = chunkedImg.createFreshCopyForTransformResult(transform->getTransformSpace());
+    double encode_ms = 0.0;
+    {
+        cscomps::util::ScopedTimer t(encode_ms);
+        transformedImg = transform->applyTransform(chunkedImg);
+    }
     double transformedEntropy = Image(transformedImg).getEntropy();
     
     ChunkedImage quantizedImg = transformedImg;
     double quantizedEntropy = transformedEntropy;
+    double quant_ms = 0.0;
     if (applyQuantization) {
+        cscomps::util::ScopedTimer tq(quant_ms);
         quantizedImg = transform->applyQuantization(transformedImg);
+        // ScopedTimer writes quant_ms on destruction
         quantizedEntropy = Image(quantizedImg).getEntropy();
     }
 
     EntropyEncoded entropyEncoded;
+    double entropy_enc_ms = 0.0;
+    double entropy_dec_ms = 0.0;
     if (transformName == "DCT") {
-        entropyEncoded = EntropyEncodeDCT(quantizedImg);
-        
-        EntropyDecodeDCT(quantizedImg, entropyEncoded);
+        {
+            cscomps::util::ScopedTimer te(entropy_enc_ms);
+            entropyEncoded = EntropyEncodeDCT(quantizedImg);
+        }
+        {
+            cscomps::util::ScopedTimer td(entropy_dec_ms);
+            EntropyDecodeDCT(quantizedImg, entropyEncoded);
+        }
     }
     
     ChunkedImage dequantizedImg = quantizedImg;
+    double dequant_ms = 0.0;
     if (applyQuantization) {
+        cscomps::util::ScopedTimer tdq(dequant_ms);
         dequantizedImg = transform->applyInverseQuantization(quantizedImg);
     }
     
-    ChunkedImage decodedImg = transform->applyInverseTransform(dequantizedImg);
+    double inverse_ms = 0.0;
+    ChunkedImage decodedImg = dequantizedImg.createFreshCopyForTransformResult(TransformSpace::Raw);
+    {
+        cscomps::util::ScopedTimer tinv(inverse_ms);
+        decodedImg = transform->applyInverseTransform(dequantizedImg);
+    }
     Image resultImg(decodedImg);
     resultImg.convertToRGB();
     
-    std::string outputPath = "savedImages/output_" + transformName + ".png";
-    resultImg.saveAsPNG(outputPath);
+    // std::string outputPath = "savedImages/output_" + transformName + ".png";
+    // resultImg.saveAsPNG(outputPath);
     
     double mse = metrics::MSE(originalImg, resultImg);
     double psnr = metrics::PSNR(originalImg, resultImg);
-    double mseChannels[3];
-    metrics::MSEChannels(originalImg, resultImg, mseChannels);
     
-    std::cout << "Transform: " << transformName << ", Chunk Size: " << chunkSize << std::endl;
-    std::cout << "MSE: " << mse << ", PSNR: " << psnr << " dB" << std::endl;
-    std::cout << "MSE (R/G/B): " << mseChannels[0] << "/" << mseChannels[1] << "/" << mseChannels[2] << std::endl;
-    std::cout << "Entropy (original/transformed/quantized): " << originalEntropy << "/" << transformedEntropy << "/" << quantizedEntropy << std::endl;
-    std::cout << "Output: " << outputPath << std::endl;
+    std::cout << "(" << mse << ", " << psnr << ", " << originalEntropy << ", " << transformedEntropy << ", " << quantizedEntropy << ")" << std::endl;
+    std::cout << "Times (ms): encode=" << encode_ms
+              << " quant=" << quant_ms
+              << " entropy_enc=" << entropy_enc_ms
+              << " entropy_dec=" << entropy_dec_ms
+              << " dequant=" << dequant_ms
+              << " inverse=" << inverse_ms << std::endl;
     
     delete transform;
     

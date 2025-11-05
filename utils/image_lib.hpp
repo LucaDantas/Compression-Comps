@@ -22,12 +22,14 @@ enum class TransformSpace {
     DCT,        // Discrete Cosine Transform
     DWT,        // Discrete Wavelet Transform
     Haar,       // Haar Wavelet Transform
-    SP          // S+P Transform
+    SP,         // S+P Transform
+    DFT         // Discrete Fourier Transform      
 };
 
 enum class ColorSpace {
     RGB,
-    YCbCr
+    YCbCr,
+    Grayscale
 };
 
 // Helper functions to convert enums to strings
@@ -45,6 +47,7 @@ std::string transformSpaceToString(TransformSpace transformSpace) {
         case TransformSpace::DCT: return "DCT";
         case TransformSpace::DWT: return "DWT";
         case TransformSpace::SP: return "SP";
+        case TransformSpace::DFT: return "DFT";
         default: return "Unknown";
     }
 }
@@ -111,6 +114,13 @@ public:
         val[0] = r;
         val[1] = g;
         val[2] = b;
+    }
+
+    // Should only be called if the data space is YCbCr - managed by the Image class. Cannot convert back.
+    void convertToGrayscale() {
+
+        val[1] = 0;
+        val[2] = 0;
     }
 };
 
@@ -194,6 +204,20 @@ public:
         }
         transformSpace = TransformSpace::Raw;
         colorSpace = ColorSpace::YCbCr;
+    }
+
+    void convertToGrayscale() {
+        assert(transformSpace == TransformSpace::Raw && "convertToGrayscale() can only be called when transformSpace is Raw");
+        assert(colorSpace == ColorSpace::YCbCr && "convertToGrayscale() can only be called when colorSpace is YCbCr");
+
+        for (int row = 0; row < rows; row++) {
+            for (int col = 0; col < columns; col++) {
+                pixels[row][col].convertToGrayscale();
+            }
+        }
+        transformSpace = TransformSpace::Raw;
+        colorSpace = ColorSpace::Grayscale;
+
     }
     
     // Print method using helper functions
@@ -614,51 +638,42 @@ protected:
     virtual void encodeChunk(const Chunk& inputChunk, Chunk& outputChunk) = 0;
     virtual void decodeChunk(const Chunk& encodedChunk, Chunk& outputChunk) = 0;
 	
-	virtual std::vector<std::vector<int>> getQuantizationMatrix() {
-		
-		std::vector<std::vector<int>> quantizationMatrix = { {16, 11, 10, 16, 24, 40, 51, 61},
-																 {12, 12, 14, 19, 26, 58, 60, 55},
-																 {14, 13, 16, 24, 40, 57, 69, 56},
-																 {14, 17, 22, 29, 51, 87, 80, 62},
-																 {18, 22, 37, 56, 68, 109, 103, 77},
-																 {24, 35, 55, 64, 81, 104, 113, 92},
-																 {49, 64, 78, 87, 103, 121, 120, 101},
-																 {72, 92, 95, 98, 112, 100, 103, 99} };
-
-		return quantizationMatrix;
-		
-	}
+	virtual std::vector<std::vector<int>> getQuantizationMatrix() = 0;
 	
-	virtual void quantizeChunk(const Chunk& inputChunk, Chunk& outputChunk) {
+	virtual void quantizeChunk(const Chunk& inputChunk, Chunk& outputChunk, double scale) {
 		
 		int size = inputChunk.getChunkSize();
 		int result;
 		int inputValue;
 		int matrixValue;
+
+        auto quantizationMatrix = getQuantizationMatrix();
 		
 		for (int ch = 0; ch < 3; ch++) {
 			for (int u = 0; u < size; u++) {
 				for (int v = 0; v < size; v++) {
 					inputValue = inputChunk[ch][u][v];
-					matrixValue = getQuantizationMatrix()[u][v];
+					matrixValue = quantizationMatrix[u][v] / scale;
 					result = std::round(inputValue / matrixValue);
 					outputChunk[ch][u][v] = result;
 				}
 			}
 		}
 	}
-	virtual void dequantizeChunk(const Chunk& encodedChunk, Chunk& outputChunk) {
+	virtual void dequantizeChunk(const Chunk& encodedChunk, Chunk& outputChunk, double scale) {
 		
 		int size = encodedChunk.getChunkSize();
 		int result;
 		int encodedValue;
 		int matrixValue;
+
+        auto quantizationMatrix = getQuantizationMatrix();
 		
 		for (int ch = 0; ch < 3; ch++) {
 			for (int u = 0; u < size; u++) {
 				for (int v = 0; v < size; v++) {
 					encodedValue = encodedChunk[ch][u][v];
-					matrixValue = getQuantizationMatrix()[u][v];
+					matrixValue = quantizationMatrix[u][v] * scale;
 					result = encodedValue * matrixValue;
 					outputChunk[ch][u][v] = result;
 				}
@@ -718,7 +733,7 @@ public:
         return result;
     }
 	
-	ChunkedImage applyQuantization(const ChunkedImage& chunkedImage) {
+	ChunkedImage applyQuantization(const ChunkedImage& chunkedImage, double scale) {
 		
 		// Check that the chunk size is 8x8
         if (chunkedImage.getChunkSize() != 8) {
@@ -734,14 +749,14 @@ public:
         for (int i = 0; i < result.getTotalChunks(); i++) {
             const Chunk& inputChunk = chunkedImage.getChunkAt(i);
             Chunk& resultChunk = result.getChunkAt(i);
-            quantizeChunk(inputChunk, resultChunk);
+            quantizeChunk(inputChunk, resultChunk, scale);
         }
         
         return result;
 
 	}
 	
-	ChunkedImage applyInverseQuantization(const ChunkedImage& chunkedImage) {
+	ChunkedImage applyInverseQuantization(const ChunkedImage& chunkedImage, double scale) {
 		
         if (chunkedImage.getChunkSize() != 8) {
             throw std::runtime_error(
@@ -756,7 +771,7 @@ public:
         for (int i = 0; i < result.getTotalChunks(); i++) {
             const Chunk& inputChunk = chunkedImage.getChunkAt(i);
             Chunk& resultChunk = result.getChunkAt(i);
-            dequantizeChunk(inputChunk, resultChunk);
+            dequantizeChunk(inputChunk, resultChunk, scale);
         }
         
         return result;
