@@ -11,6 +11,7 @@ private:
     // but increases the entropy reduction (lossy)
     double transformScale;
     double detailScale;
+	
 public:
     // Constructor specifies transform space
     HaarTransform(double transformScale = 0.125, double detailScale = 1)
@@ -101,6 +102,30 @@ public:
                     outputChunk[ch][i][j] = round(result[i][j] / transformScale);
         }
     }
+	
+	std::vector<std::vector<int>> getQuantizationMatrix(int size) {
+		
+		std::vector<std::vector<int>> quantizationMatrix(size, std::vector<int>(size, 1));
+		
+		int recursions = std::log2(size);
+		
+		for (int r = 0; r < recursions; r++) {
+		
+			for (int i = 0; i < (size/std::pow(2, r)); i++) {
+				for (int j = 0; j < (size/std::pow(2, r)); j++) {
+					if (i >= (size/std::pow(2, r+1)) || j >= (size/std::pow(2, r+1)) ) {
+						quantizationMatrix[i][j] = quantizationMatrix[i][j]*std::pow(2, r+1);
+					}
+				}
+			}
+		
+		}
+		
+		quantizationMatrix[0][0] = quantizationMatrix[0][0]*std::pow(2, recursions);
+
+		return quantizationMatrix;
+		
+	}
 
     void encodeChunk(const Chunk& inputChunk, Chunk& outputChunk) {
         outputChunk = inputChunk;

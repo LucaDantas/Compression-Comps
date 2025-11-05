@@ -22,12 +22,14 @@ enum class TransformSpace {
     DCT,        // Discrete Cosine Transform
     DWT,        // Discrete Wavelet Transform
     Haar,       // Haar Wavelet Transform
-    SP          // S+P Transform
+    SP,         // S+P Transform
+    DFT         // Discrete Fourier Transform      
 };
 
 enum class ColorSpace {
     RGB,
-    YCbCr
+    YCbCr,
+    Grayscale
 };
 
 // Helper functions to convert enums to strings
@@ -45,6 +47,7 @@ std::string transformSpaceToString(TransformSpace transformSpace) {
         case TransformSpace::DCT: return "DCT";
         case TransformSpace::DWT: return "DWT";
         case TransformSpace::SP: return "SP";
+        case TransformSpace::DFT: return "DFT";
         default: return "Unknown";
     }
 }
@@ -111,6 +114,13 @@ public:
         val[0] = r;
         val[1] = g;
         val[2] = b;
+    }
+
+    // Should only be called if the data space is YCbCr - managed by the Image class. Cannot convert back.
+    void convertToGrayscale() {
+
+        val[1] = 0;
+        val[2] = 0;
     }
 };
 
@@ -195,6 +205,20 @@ public:
         transformSpace = TransformSpace::Raw;
         colorSpace = ColorSpace::YCbCr;
     }
+
+    void convertToGrayscale() {
+        assert(transformSpace == TransformSpace::Raw && "convertToGrayscale() can only be called when transformSpace is Raw");
+        assert(colorSpace == ColorSpace::YCbCr && "convertToGrayscale() can only be called when colorSpace is YCbCr");
+
+        for (int row = 0; row < rows; row++) {
+            for (int col = 0; col < columns; col++) {
+                pixels[row][col].convertToGrayscale();
+            }
+        }
+        transformSpace = TransformSpace::Raw;
+        colorSpace = ColorSpace::Grayscale;
+
+    }
     
     // Print method using helper functions
     void printInfo() const {
@@ -239,16 +263,6 @@ public:
             return false;
         }
         
-        // Check if the image is in Raw transform space
-        // COMMENTED OUT FOR NOW - allow saving any transform space
-        /*
-        if (transformSpace != TransformSpace::Raw) {
-            std::cerr << "Error: Image must be in Raw transform space to save as PNG. Current transform space: " 
-                      << transformSpaceToString(transformSpace) << std::endl;
-            return false;
-        }
-        */
-        
         // Convert pixel data to flat RGB array for STB with clamping
         std::vector<unsigned char> rgbData(rows * columns * 3);
         int idx = 0;
@@ -282,15 +296,6 @@ public:
             return false;
         }
         
-        // Check if the image is in Raw transform space
-        // COMMENTED OUT FOR NOW - allow saving any transform space
-        /*
-        if (transformSpace != TransformSpace::Raw) {
-            std::cerr << "Error: Image must be in Raw transform space to save channel as BW. Current transform space: " 
-                      << transformSpaceToString(transformSpace) << std::endl;
-            return false;
-        }
-        */
         
         // Validate channel index
         if (channel < 0 || channel >= 3) {
@@ -336,6 +341,68 @@ public:
         
         return allSuccess;
     }
+    
+    // Write image metadata and pixel data to a vector<int>
+    // Format: [rows, columns, transformSpace, colorSpace, pixel_data...]
+    // Pixel data is stored row by row, column by column, channel by channel
+    std::vector<int> writeToVector() const {
+        std::vector<int> result;
+        
+        // Reserve space: 4 metadata values + rows * columns * 3 pixel values
+        result.reserve(4 + rows * columns * 3);
+        
+        // Write metadata
+        result.push_back(rows);
+        result.push_back(columns);
+        result.push_back(static_cast<int>(transformSpace));
+        result.push_back(static_cast<int>(colorSpace));
+        
+        // Write pixel data: row by row, column by column, channel by channel
+        for (int row = 0; row < rows; row++) {
+            for (int col = 0; col < columns; col++) {
+                result.push_back(pixels[row][col][0]);
+                result.push_back(pixels[row][col][1]);
+                result.push_back(pixels[row][col][2]);
+            }
+        }
+        
+        return result;
+    }
+    
+    // Constructor that reconstructs Image from vector<int> format
+    // Format: [rows, columns, transformSpace, colorSpace, pixel_data...]
+    Image(const std::vector<int>& data) {
+        // Check minimum size (at least 4 metadata values)
+        if (data.size() < 4) {
+            throw std::runtime_error("Invalid vector data: insufficient size for metadata");
+        }
+        
+        // Read metadata
+        rows = data[0];
+        columns = data[1];
+        transformSpace = static_cast<TransformSpace>(data[2]);
+        colorSpace = static_cast<ColorSpace>(data[3]);
+        
+        // Check if we have enough data for all pixels
+        int expectedSize = 4 + rows * columns * 3;
+        if (data.size() < expectedSize) {
+            throw std::runtime_error("Invalid vector data: insufficient size for pixel data. Expected " + 
+                                   std::to_string(expectedSize) + " elements, got " + std::to_string(data.size()));
+        }
+        
+        // Resize pixel array
+        pixels.resize(rows, std::vector<Pixel>(columns));
+        
+        // Read pixel data: row by row, column by column, channel by channel
+        int idx = 4; // Start after metadata
+        for (int row = 0; row < rows; row++) {
+            for (int col = 0; col < columns; col++) {
+                pixels[row][col][0] = data[idx++];
+                pixels[row][col][1] = data[idx++];
+                pixels[row][col][2] = data[idx++];
+            }
+        }
+    }
 };
 
 // Function to compute pixel-wise difference between two images
@@ -349,14 +416,6 @@ Image imageDiff(const Image& img1, const Image& img2, int scale = 100) {
     if (img1.getColorSpace() != img2.getColorSpace()) {
         throw std::runtime_error("Images must be in the same color space for difference computation");
     }
-    
-    // Check if both images are in Raw transform space
-    // COMMENTED OUT FOR NOW - allow difference computation for any transform space
-    /*
-    if (img1.getTransformSpace() != TransformSpace::Raw || img2.getTransformSpace() != TransformSpace::Raw) {
-        throw std::runtime_error("Both images must be in Raw transform space for difference computation");
-    }
-    */
     
     // Create result image with same dimensions and properties as input images
     Image result = img1; // Copy constructor to get same dimensions and properties
@@ -579,51 +638,42 @@ protected:
     virtual void encodeChunk(const Chunk& inputChunk, Chunk& outputChunk) = 0;
     virtual void decodeChunk(const Chunk& encodedChunk, Chunk& outputChunk) = 0;
 	
-	virtual std::vector<std::vector<int>> getQuantizationMatrix() {
-		
-		std::vector<std::vector<int>> quantizationMatrix = { {16, 11, 10, 16, 24, 40, 51, 61},
-																 {12, 12, 14, 19, 26, 58, 60, 55},
-																 {14, 13, 16, 24, 40, 57, 69, 56},
-																 {14, 17, 22, 29, 51, 87, 80, 62},
-																 {18, 22, 37, 56, 68, 109, 103, 77},
-																 {24, 35, 55, 64, 81, 104, 113, 92},
-																 {49, 64, 78, 87, 103, 121, 120, 101},
-																 {72, 92, 95, 98, 112, 100, 103, 99} };
-
-		return quantizationMatrix;
-		
-	}
+	virtual std::vector<std::vector<int>> getQuantizationMatrix() = 0;
 	
-	virtual void quantizeChunk(const Chunk& inputChunk, Chunk& outputChunk) {
+	virtual void quantizeChunk(const Chunk& inputChunk, Chunk& outputChunk, double scale) {
 		
 		int size = inputChunk.getChunkSize();
 		int result;
 		int inputValue;
 		int matrixValue;
+
+        auto quantizationMatrix = getQuantizationMatrix();
 		
 		for (int ch = 0; ch < 3; ch++) {
 			for (int u = 0; u < size; u++) {
 				for (int v = 0; v < size; v++) {
 					inputValue = inputChunk[ch][u][v];
-					matrixValue = getQuantizationMatrix()[u][v];
+					matrixValue = quantizationMatrix[u][v] / scale;
 					result = std::round(inputValue / matrixValue);
 					outputChunk[ch][u][v] = result;
 				}
 			}
 		}
 	}
-	virtual void dequantizeChunk(const Chunk& encodedChunk, Chunk& outputChunk) {
+	virtual void dequantizeChunk(const Chunk& encodedChunk, Chunk& outputChunk, double scale) {
 		
 		int size = encodedChunk.getChunkSize();
 		int result;
 		int encodedValue;
 		int matrixValue;
+
+        auto quantizationMatrix = getQuantizationMatrix();
 		
 		for (int ch = 0; ch < 3; ch++) {
 			for (int u = 0; u < size; u++) {
 				for (int v = 0; v < size; v++) {
 					encodedValue = encodedChunk[ch][u][v];
-					matrixValue = getQuantizationMatrix()[u][v];
+					matrixValue = quantizationMatrix[u][v] * scale;
 					result = encodedValue * matrixValue;
 					outputChunk[ch][u][v] = result;
 				}
@@ -692,7 +742,7 @@ public:
         for (int i = 0; i < result.getTotalChunks(); i++) {
             const Chunk& inputChunk = chunkedImage.getChunkAt(i);
             Chunk& resultChunk = result.getChunkAt(i);
-            quantizeChunk(inputChunk, resultChunk);
+            quantizeChunk(inputChunk, resultChunk, scale);
         }
 
         return result;
@@ -708,7 +758,7 @@ public:
         for (int i = 0; i < result.getTotalChunks(); i++) {
             const Chunk& inputChunk = chunkedImage.getChunkAt(i);
             Chunk& resultChunk = result.getChunkAt(i);
-            dequantizeChunk(inputChunk, resultChunk);
+            dequantizeChunk(inputChunk, resultChunk, scale);
         }
 
         return result;
