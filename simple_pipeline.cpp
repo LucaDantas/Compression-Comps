@@ -16,10 +16,9 @@
 int main(int argc, char* argv[]) {
     // Check command line arguments (minimum required: transform chunk_size image_path)
     if (argc < 4) {
-        std::cerr << "Usage: " << argv[0] << " <transform_name> <chunk_size> <image_path> [options]" << std::endl;
-        std::cerr << "Example: " << argv[0] << " DCT 8 Datasets/KodakImages/1.png" << std::endl;
-        std::cerr << "\nAvailable transforms: DCT, SP, HAAR" << std::endl;
-        std::cerr << "Options (SP only): --scale <float> --q-ll <int> --q-hl <int> --q-lh <int> --q-hh <int> --dz <int> --level-gamma <float>" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " <transform_name> <image_path> <scale>" << std::endl;
+        std::cerr << "Example: " << argv[0] << " DCT 8 Datasets/SquaredKodak/1.png" << std::endl;
+        std::cerr << "\nAvailable transforms: DCT, SP, HAAR, DFT" << std::endl;
         return 1;
     }
     
@@ -28,40 +27,16 @@ int main(int argc, char* argv[]) {
     std::transform(transformName.begin(), transformName.end(), transformName.begin(), ::toupper);
     
     // Get chunk size
-    int chunkSize = std::stoi(argv[2]);
-    
-    bool applyQuantization = true; // enable quantization by default for experiments
-    std::string imagePath = argv[3];
-
-    // Parse optional flags starting at argv[4]
-    SPTransform::QuantParams qp = SPTransform::MakeQuantParams(1.0f);
-    for (int ai = 4; ai < argc; ++ai) {
-        std::string a = argv[ai];
-        if (a == "--scale" && ai + 1 < argc) {
-            qp.scale = std::stof(argv[++ai]);
-        } else if (a == "--q-ll" && ai + 1 < argc) {
-            qp.q_LL = std::stoi(argv[++ai]);
-        } else if (a == "--q-hl" && ai + 1 < argc) {
-            qp.q_HL = std::stoi(argv[++ai]);
-        } else if (a == "--q-lh" && ai + 1 < argc) {
-            qp.q_LH = std::stoi(argv[++ai]);
-        } else if (a == "--q-hh" && ai + 1 < argc) {
-            qp.q_HH = std::stoi(argv[++ai]);
-        } else if (a == "--dz" && ai + 1 < argc) {
-            qp.deadzone = std::max(0, std::stoi(argv[++ai]));
-        } else if (a == "--level-gamma" && ai + 1 < argc) {
-            qp.level_gamma = std::stof(argv[++ai]);
-        } else if (a == "--no-quant") {
-            applyQuantization = false;
-        } else {
-            std::cerr << "Unknown option: " << a << std::endl;
-        }
-    }
+    double scale = std::strtod(argv[3], nullptr);
+    int chunkSize;
+    std::string imagePath = argv[2];
     
     // Read and process image
     Image originalImg(imagePath);
     Image img(originalImg);
     double originalEntropy = originalImg.getEntropy();
+
+    if (transformName == "DFT" || transformName == "DCT") chunkSize = 8; else chunkSize = originalImg.getRows();
     
     img.convertToYCbCr();
     ChunkedImage chunkedImg(img, chunkSize);
@@ -71,7 +46,7 @@ int main(int argc, char* argv[]) {
         transform = new DCTTransform();
     } else if (transformName == "SP") {
         // construct SP transform with the requested quant params
-        transform = new SPTransform(qp);
+        transform = new SPTransform();
     } else if (transformName == "HAAR") {
         transform = new HaarTransform();
     } else if (transformName == "DFT") {
