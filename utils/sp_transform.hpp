@@ -9,6 +9,8 @@
 
 #include <cassert>
 #include <vector>
+#include <cmath>
+#include <algorithm>
 #include "image_lib.hpp" 
 
 namespace cscomps {
@@ -302,11 +304,71 @@ private:
   cscomps::sp::SPCore spTransform;
 
 public:
-  // Constructor with optional S+P parameters
-  explicit SPTransform(cscomps::sp::Params p = cscomps::sp::Params::NaturalImage())
-      : Transform(TransformSpace::SP), params(p), spTransform(p) {}
+  // Quantization parameterization
+  struct QuantParams {
+    int q_LL = 1;   // base LL step
+    int q_HL = 4;   // base HL step
+    int q_LH = 4;   // base LH step
+    int q_HH = 6;   // base HH step
+    int deadzone = 1; // dead-zone multiplier
+    float scale = 1.0f; // global scale
+    float level_gamma = 1.0f; // geometric per-level multiplier
+    QuantParams() = default;
+  };
 
-protected:
+  struct QTable {
+    int ll;
+    int hl;
+    int lh;
+    int hh;
+    int dz;
+  };
+
+  // Construct with optional S+P params and optional quant params
+  explicit SPTransform(cscomps::sp::Params p = cscomps::sp::Params::NaturalImage())
+      : Transform(TransformSpace::SP), params(p), spTransform(p), qparams() {}
+  explicit SPTransform(const QuantParams& qp, cscomps::sp::Params p = cscomps::sp::Params::NaturalImage())
+      : Transform(TransformSpace::SP), params(p), spTransform(p), qparams(qp) {}
+
+  // Convenience factory for QuantParams
+  static QuantParams MakeQuantParams(float scale) {
+    QuantParams qp;
+    qp.scale = scale;
+    return qp;
+  }
+
+  void setQuantParams(const QuantParams& qp) { qparams = qp; }
+  QuantParams getQuantParams() const { return qparams; }
+
+  // Build a QTable for a given recursion level
+  QTable MakeQTableForLevel(int level) const {
+    QTable qt;
+    float level_factor = 1.0f;
+    // Only use geometric scaling when level_gamma > 0.0
+    if (qparams.level_gamma > 0.0f) {
+      level_factor = std::pow(qparams.level_gamma, static_cast<float>(level));
+    } else {
+      // level_gamma <= 0.0 signals "no per-level scaling"
+      level_factor = 1.0f;
+    }
+    auto scaled = [&](int base) -> int {
+      float raw = static_cast<float>(base) * qparams.scale * level_factor;
+      int v = static_cast<int>(std::round(raw));
+      return (v <= 0) ? 0 : v;
+    };
+    qt.ll = scaled(qparams.q_LL);
+    qt.hl = scaled(qparams.q_HL);
+    qt.lh = scaled(qparams.q_LH);
+    qt.hh = scaled(qparams.q_HH);
+    qt.dz = (qparams.deadzone <= 0) ? 0 : qparams.deadzone;
+    return qt;
+  }
+
+private:
+  QuantParams qparams;
+public:
+
+public:
   // Encode a chunk: apply forward S+P transform to each channel
   void encodeChunk(const Chunk& inputChunk, Chunk& outputChunk) override {
     const int chunkSize = inputChunk.getChunkSize();
@@ -372,6 +434,198 @@ protected:
       }
     }
   }
+
+  // helpers
+  static inline int q_ll_plain(int x, int step) {
+    return (step > 0) ? static_cast<int>(std::round(static_cast<float>(x) / static_cast<float>(step))) : x;
+  }
+  static inline int dq_ll_plain(int q, int step) {
+    if (step <= 0) return q;
+    // reconstruct to bin center (midpoint)
+    return q * step + (step >> 1);
+  }
+
+  static inline int q_hp_deadzone(int x, int step, int dz_mult) {
+    if (step <= 0) return x;
+    const int z = dz_mult * step;  // half-width of zero bin
+    const int ax = (x >= 0) ? x : -x;
+    if (ax < z) return 0;
+    int q = static_cast<int>(std::floor(static_cast<float>(ax - z) / static_cast<float>(step))) + 1;
+    return (x < 0) ? -q : q;
+  }
+  static inline int dq_hp_midpoint(int q, int step) {
+    if (step <= 0) return q;
+    if (q == 0)    return 0;
+    int aq = (q >= 0) ? q : -q;
+    int sign = (q >= 0) ? 1 : -1;
+    // For q>0, midpoint = sign * (dz*step + (q-1)*step + 0.5*step)
+    // deadzone is handled in quantization step, not here
+    int midpoint = sign * ((aq - 1) * step + (step / 2));
+    return midpoint;
+  }
+
+  // Try to make quantization parametized
+  static inline int QuantizeLL(float v, int step) {
+    if (step <= 0) return static_cast<int>(std::round(v));
+    return static_cast<int>(std::round(v / static_cast<float>(step)));
+  }
+
+  static inline int QuantizeDeadZone(float v, int step, int dz) {
+    if (step <= 0) return static_cast<int>(std::round(v));
+    const float t = static_cast<float>(dz) * static_cast<float>(step);
+    if (std::abs(v) < t) return 0;
+    float s = (std::abs(v) - t) / static_cast<float>(step) + 1.0f;
+    int q = static_cast<int>(std::floor(s));
+    return (v >= 0.0f) ? q : -q;
+  }
+
+  static inline float DequantizeLL(int q, int step) {
+    if (step <= 0) return static_cast<float>(q);
+    return static_cast<float>(q * step);
+  }
+
+  static inline float DequantizeDeadZone(int q, int step, int dz) {
+    if (step <= 0) return static_cast<float>(q);
+    if (q == 0) return 0.0f;
+    int aq = (q >= 0) ? q : -q;
+    float sign = (q >= 0) ? 1.0f : -1.0f;
+    float edge = static_cast<float>(dz) * static_cast<float>(step);
+    // place the reconstruction value at edge + (aq-1 + 0.5)*step
+    float val = edge + (static_cast<float>(aq - 1) + 0.5f) * static_cast<float>(step);
+    return sign * val;
+  }
+
+  // Recursive band iterator over LL 
+  template <typename QF_LL, typename QF_HP>
+  static void forEachBandLevel(
+      int* base, int stride, int W, int H, int levels,
+      QF_LL q_ll, QF_HP q_hp) {
+
+    int w = W, h = H;
+    for (int lev = 0; lev < levels; ++lev) {
+      const int wLL = (w + 1) >> 1;
+      const int hLL = (h + 1) >> 1;
+
+      for (int y = 0; y < h; ++y) {
+        int* row = base + y * stride;
+        for (int x = 0; x < w; ++x) {
+          const bool isLL = (x < wLL) && (y < hLL);
+          const bool isHL = (x >= wLL) && (y < hLL);
+          const bool isLH = (x <  wLL) && (y >= hLL);
+          const bool isHH = (x >= wLL) && (y >= hLL);
+
+          row[x] = isLL
+            ? q_ll(row[x], lev)
+            : q_hp(row[x], lev, isHL, isLH, isHH);
+        }
+      }
+      w = wLL; h = hLL; // recurse to next LL
+    }
+  }
+
+  // Public API on SPTransform
+  private:
+    int levelsFor(int W, int H) const {
+      if (params.levels > 0) return params.levels;
+      int w = W, h = H, L = 0;
+      while (w >= 2 && h >= 2 && L < 10) {
+        ++L; w = (w + 1) >> 1; h = (h + 1) >> 1;
+      }
+      return L;
+    }
+  public:
+    //override optional: set quant params directly
+    void setQuantTable(const QTable& /*unused*/) { /* kept for API compatibility */ }
+
+    // Quantize a single chunk (override of Transform::quantizeChunk)
+    void quantizeChunk(const Chunk& inputChunk, Chunk& outputChunk) override {
+      const int chunkSize = inputChunk.getChunkSize();
+      const int W = chunkSize;
+      const int H = chunkSize;
+      const int S = chunkSize;
+      const int L = levelsFor(W, H);
+
+      std::vector<QTable> qtables;
+      qtables.reserve(L);
+      for (int lev = 0; lev < L; ++lev) {
+        qtables.push_back(MakeQTableForLevel(lev));
+      }
+
+      for (int ch = 0; ch < 3; ++ch) {
+        std::vector<int> plane(chunkSize * chunkSize);
+        for (int y = 0; y < chunkSize; ++y)
+          for (int x = 0; x < chunkSize; ++x)
+            plane[y * chunkSize + x] = inputChunk[ch][y][x];
+
+        auto q_ll = [&](int v, int lev) -> int {
+          const QTable& qt = qtables[lev];
+          return QuantizeLL(static_cast<float>(v), qt.ll);
+        };
+
+        auto q_hp = [&](int v, int lev, bool isHL, bool isLH, bool isHH) -> int {
+          const QTable& qt = qtables[lev];
+          int step = isHL ? qt.hl : (isLH ? qt.lh : qt.hh);
+          return QuantizeDeadZone(static_cast<float>(v), step, qt.dz);
+        };
+
+        forEachBandLevel(plane.data(), S, W, H, L, q_ll, q_hp);
+
+        // write back (store ints)
+        for (int y = 0; y < chunkSize; ++y)
+          for (int x = 0; x < chunkSize; ++x)
+            outputChunk[ch][y][x] = plane[y * chunkSize + x];
+      }
+    }
+
+    // Dequantize a single chunk (override of Transform::dequantizeChunk)
+    void dequantizeChunk(const Chunk& encodedChunk, Chunk& outputChunk) override {
+      const int chunkSize = encodedChunk.getChunkSize();
+      const int W = chunkSize;
+      const int H = chunkSize;
+      const int S = chunkSize;
+      const int L = levelsFor(W, H);
+
+      std::vector<QTable> qtables;
+      qtables.reserve(L);
+      for (int lev = 0; lev < L; ++lev) {
+        qtables.push_back(MakeQTableForLevel(lev));
+      }
+
+      for (int ch = 0; ch < 3; ++ch) {
+        std::vector<int> plane(chunkSize * chunkSize);
+        for (int y = 0; y < chunkSize; ++y)
+          for (int x = 0; x < chunkSize; ++x)
+            plane[y * chunkSize + x] = encodedChunk[ch][y][x];
+
+        auto dq_ll = [&](int q, int lev) -> int {
+          const QTable& qt = qtables[lev];
+          float v = DequantizeLL(q, qt.ll);
+          return static_cast<int>(std::round(v));
+        };
+
+        auto dq_hp = [&](int q, int lev, bool isHL, bool isLH, bool isHH) -> int {
+          const QTable& qt = qtables[lev];
+          int step = isHL ? qt.hl : (isLH ? qt.lh : qt.hh);
+          float v = DequantizeDeadZone(q, step, qt.dz);
+          return static_cast<int>(std::round(v));
+        };
+
+        forEachBandLevel(plane.data(), S, W, H, L, dq_ll, dq_hp);
+
+        for (int y = 0; y < chunkSize; ++y)
+          for (int x = 0; x < chunkSize; ++x)
+            outputChunk[ch][y][x] = plane[y * chunkSize + x];
+      }
+    }
+
+    // Estimate bits-per-pixel from a quantized ChunkedImage using symbol entropy (bits/sample * channels)
+    static double EstimateBpp(const ChunkedImage& qimg) {
+      // Leverage Image entropy implementation (counts over all channel values)
+      Image tmp(qimg);
+      double bits_per_sample = tmp.getEntropy(); // bits per sample (channel)
+      return bits_per_sample * 3.0; // bits per pixel (3 channels)
+    }
+
 };
 
 #endif // CS_COMPS_SP_TRANSFORM_HPP
