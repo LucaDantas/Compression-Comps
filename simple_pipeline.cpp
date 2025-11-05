@@ -5,6 +5,7 @@
 #include "utils/image_lib.hpp"
 #include "utils/dct_transform.hpp"
 #include "utils/sp_transform.hpp"
+#include "utils/dft_transform.hpp"
 #include "DWT/haar_transform.hpp"
 #include "utils/entropy.hpp"
 #include "utils/dpcm.hpp"
@@ -46,6 +47,9 @@ int main(int argc, char* argv[]) {
         transform = new SPTransform();
     } else if (transformName == "HAAR") {
         transform = new HaarTransform();
+    } else if (transformName == "DFT") {
+        transform = new DFTTransform();
+        img.convertToGrayscale();
     }
     
     // Measure transform encode time
