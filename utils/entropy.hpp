@@ -86,8 +86,8 @@ void VecToEntropyEncode(std::vector<int> encoded, EntropyEncoded& encodedDCT, in
 		
 		tempDC = (int *)malloc(sizeof(int)*numChunks);
 		
-		for (int j = i; j < i + numChunks; j++) {
-			tempDC[j - i] = encoded[j];
+		for (int j = 0; j < numChunks; j++) {
+			tempDC[j] = encoded[j+i];
 		}
 		
 		DCComponent[channel] = tempDC;
@@ -98,7 +98,7 @@ void VecToEntropyEncode(std::vector<int> encoded, EntropyEncoded& encodedDCT, in
 		ACSize = encoded[i];
 		i++;
 		
-		for (int j = i; j < i + 2*ACSize; j += 2) {
+		for (int j = 0; j < 2*ACSize; j += 2) {
 			ACComponent[channel].push_back(std::make_pair(encoded[i+j], encoded[i+j+1]));
 		}
 		
