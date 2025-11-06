@@ -12,7 +12,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import List, Tuple, Dict
 
 # Configuration
-QUANTIZATION_SCALES = [i/2 for i in range(2, 20)]
+QUANTIZATION_SCALES = [i for i in range(1, 31)]
 TRANSFORMS = ["SP", "HAAR", "DCT", "DFT"]
 DATASETS_DIR = "Datasets"
 EXECUTABLE = "./pipeline_data_collection"
@@ -51,13 +51,13 @@ def parse_output(output: str) -> Tuple[float, float, float, float, float, float]
     compression_ratio, entropy_quantized, mse, psnr, encoding_time, decoding_time = map(float, output.strip()[1:-1].split(','))
     return (compression_ratio, entropy_quantized, mse, psnr, encoding_time, decoding_time)
 
-def run_pipeline(transform: str, image_path: str, quant_scale: float) -> Dict:
+def run_pipeline(transform: str, image_path: str, quant_scale: float, save_flag: str) -> Dict:
     """
     Run simple_pipeline for a single image and transform.
     Returns a dict with the results.
     """
     result = subprocess.run(
-        [EXECUTABLE, transform, image_path, str(quant_scale)],
+        [EXECUTABLE, transform, image_path, str(quant_scale), save_flag],
         capture_output=True,
         text=True,
         timeout=300  # 5 minute timeout per image
@@ -117,8 +117,12 @@ def main():
     tasks = []
     for transform in TRANSFORMS:
         for dataset_name, image_path in images:
+            if dataset_name == "SquaredKodak" and image_path == "1.png":
+                save_flag = f"results/{transform}/Kodak1quantization="
+            else:
+                save_flag = "no_save"
             for quant_scale in QUANTIZATION_SCALES:
-                tasks.append((transform, dataset_name, image_path, quant_scale))
+                tasks.append((transform, dataset_name, image_path, quant_scale, save_flag))
     
     print(f"Total tasks: {len(tasks)} (4 transforms × {len(images)} images)")
     
@@ -129,13 +133,13 @@ def main():
     with ProcessPoolExecutor() as executor:
         # Submit all tasks
         future_to_task = {
-            executor.submit(run_pipeline, transform, image_path, quant_scale): (transform, dataset_name, image_path, quant_scale)
-            for transform, dataset_name, image_path, quant_scale in tasks[:10] # SAMPLE TOGGLE
+            executor.submit(run_pipeline, transform, image_path, quant_scale, save_flag): (transform, dataset_name, image_path, quant_scale, save_flag)
+            for transform, dataset_name, image_path, quant_scale, save_flag in tasks[:20] # SAMPLE TOGGLE
         }
         
         # Collect results as they complete
         for future in as_completed(future_to_task):
-            transform, dataset_name, image_path, quant_scale = future_to_task[future]
+            transform, dataset_name, image_path, quant_scale, save_flag = future_to_task[future]
             result = future.result()
             results.append(result)
             completed += 1

@@ -115,13 +115,18 @@ public:
         val[2] = b;
     }
 
-    void convertToYCbCrFromGrayscale() {
+    void convertToRGBFromGrayscale() {
         val[1] = val[2] = val[0];
     }
 
     // Should only be called if the data space is YCbCr - managed by the Image class. Cannot convert back.
     void convertToGrayscale() {
+        int r = val[0], g = val[1], b = val[2];
+        
+        // Standard RGB to YCbCr conversion as defined in the paper JPEG FIF
+        int y = (int)(0.299 * r + 0.587 * g + 0.114 * b);
 
+        val[0] = y;
         val[1] = 0;
         val[2] = 0;
     }
@@ -209,22 +214,22 @@ public:
         colorSpace = ColorSpace::YCbCr;
     }
 
-    void convertToYCbCrFromGrayscale() {
+    void convertToRGBFromGrayscale() {
         assert(transformSpace == TransformSpace::Raw && "convertToYCbCr() can only be called when transformSpace is Raw");
-        assert(colorSpace == ColorSpace::Grayscale && "convertToYCbCrFromGraysale() can only be called when colorSpace is Grayscale");
+        assert(colorSpace == ColorSpace::Grayscale && "convertToRGBFromGraysale() can only be called when colorSpace is Grayscale");
         
         for (int row = 0; row < rows; row++) {
             for (int col = 0; col < columns; col++) {
-                pixels[row][col].convertToYCbCrFromGrayscale();
+                pixels[row][col].convertToRGBFromGrayscale();
             }
         }
         transformSpace = TransformSpace::Raw;
-        colorSpace = ColorSpace::YCbCr;
+        colorSpace = ColorSpace::RGB;
     }
 
     void convertToGrayscale() {
         assert(transformSpace == TransformSpace::Raw && "convertToGrayscale() can only be called when transformSpace is Raw");
-        assert(colorSpace == ColorSpace::YCbCr && "convertToGrayscale() can only be called when colorSpace is YCbCr");
+        assert(colorSpace == ColorSpace::RGB && "convertToGrayscale() can only be called when colorSpace is RGB");
 
         for (int row = 0; row < rows; row++) {
             for (int col = 0; col < columns; col++) {
