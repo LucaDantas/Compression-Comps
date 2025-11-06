@@ -14,8 +14,8 @@ import re
 import statistics
 
 # Configuration
-CHUNK_SIZE = 512
-TRANSFORMS = ["SP", "HAAR"]
+QUANTIZATION_SCALES = [2**i for i in range(9)]
+TRANSFORMS = ["SP", "HAAR", "DCT", "DFT"]
 DATASETS_DIR = "Datasets"
 EXECUTABLE = "./simple_pipeline"
 RESULTS_DIR = "results"
