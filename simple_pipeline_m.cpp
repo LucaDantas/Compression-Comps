@@ -71,6 +71,9 @@ int main(int argc, char* argv[]) {
     quantizedImg = transform->applyQuantization(transformedImg, scale);
     double quantizedEntropy = Image(quantizedImg).getEntropy();
 
+    std::vector<int> encodedImg = EntropyEncode(quantizedImg);
+    
+
     //
     // ENTROPY ENCODING AND HUFFMAN SECTION GOES HERE
     //
