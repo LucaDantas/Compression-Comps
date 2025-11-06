@@ -12,7 +12,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import List, Tuple, Dict
 
 # Configuration
-QUANTIZATION_SCALES = [i for i in range(1, 256)]
+QUANTIZATION_SCALES = [i/2 for i in range(2, 20)]
 TRANSFORMS = ["SP", "HAAR", "DCT", "DFT"]
 DATASETS_DIR = "Datasets"
 EXECUTABLE = "./pipeline_data_collection"
