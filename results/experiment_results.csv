@@ -1,0 +1,11 @@
+transform,dataset,image_path,mse,psnr,compression_ratio,quantized_entropy,quantization_scale,encode_ms,decode_ms,error
+SP,SquaredAerialImages,Datasets/SquaredAerialImages/1.png,97417.3,-1.75556,7.88751,0.0504664,8,2110.09,1221.41,
+SP,SquaredAerialImages,Datasets/SquaredAerialImages/1.png,97417.3,-1.75556,7.51488,0.185345,5,2153.65,1245.65,
+SP,SquaredAerialImages,Datasets/SquaredAerialImages/1.png,97417.3,-1.75556,7.18767,0.28663,4,2098.97,1312.84,
+SP,SquaredAerialImages,Datasets/SquaredAerialImages/1.png,97417.3,-1.75556,6.54912,0.467796,3,2176.59,1278.78,
+SP,SquaredAerialImages,Datasets/SquaredAerialImages/1.png,97417.3,-1.75556,7.70226,0.121248,6,2173.86,1281.4,
+SP,SquaredAerialImages,Datasets/SquaredAerialImages/1.png,97417.3,-1.75556,7.81695,0.0787366,7,2249.05,1276.99,
+SP,SquaredAerialImages,Datasets/SquaredAerialImages/1.png,97417.3,-1.75556,5.31,0.863201,2,2530.05,1276.23,
+SP,SquaredAerialImages,Datasets/SquaredAerialImages/1.png,97417.3,-1.75556,3.18137,1.93119,1,2562.48,1319.11,
+SP,SquaredAerialImages,Datasets/SquaredAerialImages/1.png,97417.3,-1.75556,7.93094,0.032274,9,1346.88,770.18,
+SP,SquaredAerialImages,Datasets/SquaredAerialImages/1.png,97417.3,-1.75556,7.95935,0.0198498,10,1382.29,772.001,

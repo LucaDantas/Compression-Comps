@@ -8,7 +8,7 @@
 #include <fstream>
 #include <vector>
 // Only keep essential headers
-#include "utils/entropy.hpp"
+#include "utils/entropy2.hpp"
 #include "utils/dpcm.hpp"
 #include "utils/rle.hpp"
 #include "utils/metrics.cpp"
