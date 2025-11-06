@@ -146,6 +146,10 @@ int main(int argc, char* argv[]) {
     // Calculate metrics
     double mse = metrics::MSE(originalImg, resultImg);
     double psnr = metrics::PSNR(originalImg, resultImg);
+
+    resultImg.saveAsPNG("decodedImage.png");
+    Image diffImg = imageDiff(originalImg, resultImg);
+    diffImg.saveAsPNG("differenceImage.png");
     
     // Delete temporary file
     std::filesystem::remove(tempFile);

@@ -636,7 +636,7 @@ protected:
 			for (int u = 0; u < size; u++) {
 				for (int v = 0; v < size; v++) {
 					inputValue = inputChunk[ch][u][v];
-					matrixValue = quantizationMatrix[u][v] / scale;
+					matrixValue = quantizationMatrix[u][v] * scale;
 					result = std::round(inputValue / matrixValue);
 					outputChunk[ch][u][v] = result;
 				}
