@@ -121,4 +121,3 @@ public:
 };
 
 #endif // HAAR_TRANSFORM_HPP
-

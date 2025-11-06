@@ -15,7 +15,7 @@ struct EntropyEncoded {
 };
 
 EntropyEncoded EntropyEncodeDCT(const ChunkedImage& chunkedImage);
-EntropyEncoded EntropyEncode(const ChunkedImage& chunkedImage);
+std::vector<int> EntropyEncode(const ChunkedImage& chunkedImage);
 void EntropyDecodeDCT(ChunkedImage& chunkedImage, const EntropyEncoded& encoded);
 void EntropyDecode(ChunkedImage& chunkedImage, const EntropyEncoded& encoded);
 
@@ -42,6 +42,75 @@ void populateChunk(const std::vector<std::vector<int>>& arr, std::vector<std::ve
 	}
 }
 
+std::vector<int> EntropyEncodeToVec(const EntropyEncoded& encoded, int numChunks, int size) { // 0 - numChunks; 1 - size; 2 - transformSpace;
+	std::vector<int> result;
+	result.push_back(numChunks);
+	result.push_back(size);
+	result.push_back(0);
+	
+	std::vector<int *> DCComponent = encoded.DCComponent;
+	std::vector<std::vector<std::pair<int, int>>> ACComponent = encoded.ACComponent;
+	
+	for (int channel = 0; channel < 3; channel++) {
+		
+		result.insert(result.end(), DCComponent[channel], DCComponent[channel] + numChunks);
+		
+		free(DCComponent[channel]);
+		
+		result.push_back(ACComponent[channel].size());
+		
+		for (int i = 0; i < ACComponent[channel].size(); i++) {
+			result.push_back(ACComponent[channel][i].first);
+			result.push_back(ACComponent[channel][i].second);
+		}
+		
+	}
+	
+	return result;
+	
+}
+
+void VecToEntropyEncode(std::vector<int> encoded, EntropyEncoded& encodedDCT, int numChunks, int size) {
+	
+	int *tempDC;
+	
+	int i = 3; //ignore metadata
+	int ACSize;
+	
+	std::vector<int *> DCComponent(3, NULL);
+	std::vector<std::vector<std::pair<int, int>>> ACComponent(3, std::vector<std::pair<int, int>>());
+	
+	for (int channel = 0; channel < 3; channel++) {
+		
+		// DC
+		
+		tempDC = (int *)malloc(sizeof(int)*numChunks);
+		
+		for (int j = 0; j < numChunks; j++) {
+			tempDC[j] = encoded[j+i];
+		}
+		
+		DCComponent[channel] = tempDC;
+		
+		// AC 
+		
+		i += numChunks;
+		ACSize = encoded[i];
+		i++;
+		
+		for (int j = 0; j < 2*ACSize; j += 2) {
+			ACComponent[channel].push_back(std::make_pair(encoded[i+j], encoded[i+j+1]));
+		}
+		
+		i += 2*ACSize;
+		
+	}
+	
+	encodedDCT.DCComponent = DCComponent;
+	encodedDCT.ACComponent = ACComponent;
+	
+}
+
 EntropyEncoded EntropyEncodeDCT(const ChunkedImage& chunkedImage) {
 	int numChunks = chunkedImage.getTotalChunks();
 	int size = chunkedImage.getChunkSize();
@@ -66,37 +135,8 @@ EntropyEncoded EntropyEncodeDCT(const ChunkedImage& chunkedImage) {
 			curChunk = chunkedImage.getChunkAt(i)[channel].data();
 			flat = zigzagFlattenArray(curChunk, size);
 			
-			if (channel == 0 && i+1 == 2) {
-				for (int u = 0; u < size; u++) {
-					printArray(curChunk[u].data(), size);
-				}
-				printf("\n");
-				
-				printArray(flat, size*size);
-				printf("------------------\n");
-	
-			}
-			
-			// if (channel == 0 && i+1 == 587) {
-				// for (int u = 0; u < size; u++) {
-					// printArray(curChunk[u].data(), size);
-				// }
-				// printf("\n");
-				
-				// printArray(flat, size*size);
-				// printf("------------------\n");
-	
-			// }
-			
 			rleResult = rle::encoder(flat, size);
-			
-			// if (channel == 0 && i+1 == 1) {
-				// for (int u = 0; u < size*size && rleResult[u].first > -1; u++) {
-					// printf("(%d, %d)\n", rleResult[u].first, rleResult[u].second);
-				// }
-				// printf("--------\n");
-			// }
-			
+
 			populateVector(rleResult, finalVector[channel], size);
 			curRleSum = 0;
 			free(flat);
@@ -112,14 +152,57 @@ EntropyEncoded EntropyEncodeDCT(const ChunkedImage& chunkedImage) {
 	
 }
 
-
-EntropyEncoded EntropyEncode(const ChunkedImage& chunkedImage) {
+std::vector<int> EntropyEncodeHaar(const ChunkedImage& chunkedImage) {
+	int numChunks = chunkedImage.getTotalChunks();
+	int size = chunkedImage.getChunkSize();
+	int predictionSize = 4;
+	int *predictedResult = NULL;
+	const std::vector<int> *curChunk = NULL;
+	std::vector<int> result;
+	result.push_back(numChunks);
+	result.push_back(size);
+	TransformSpace transformSpace = chunkedImage.getTransformSpace();
+    switch (transformSpace) {
+        case TransformSpace::Haar: 
+			result.push_back(1);
+			break;
+        case TransformSpace::SP:
+			result.push_back(2);
+			break;
+		default:
+			break;
+    }
+	int *flat;
 	
-	EntropyEncoded result;
+	for (int channel = 0; channel < 3; channel++) {
+		for (int i = 0; i < numChunks; i++) {
+			curChunk = chunkedImage.getChunkAt(i)[channel].data();
+			flat = zigzagFlattenArray(curChunk, size);
+			
+			predictedResult = dpcm::encoder(flat, size*size, predictionSize);
+			free(flat);
+			
+			result.insert(result.end(), predictedResult, predictedResult + size*size);
+			free(predictedResult);
+		}
+	}
+
+	return result;
+	
+}
+
+
+std::vector<int> EntropyEncode(const ChunkedImage& chunkedImage) {
+	
+	std::vector<int> result;
 	
 	if (chunkedImage.getTransformSpace() == TransformSpace::DCT) {
-		result = EntropyEncodeDCT(chunkedImage);
-	} 
+		EntropyEncoded resultInitial;
+		resultInitial = EntropyEncodeDCT(chunkedImage);
+		result = EntropyEncodeToVec(resultInitial, chunkedImage.getTotalChunks(), chunkedImage.getChunkSize());
+	} else if (chunkedImage.getTransformSpace() == TransformSpace::SP || chunkedImage.getTransformSpace() == TransformSpace::Haar) {
+		result = EntropyEncodeHaar(chunkedImage);
+	}
 	
 	return result;
 	
@@ -170,58 +253,47 @@ void EntropyDecodeDCT(ChunkedImage& chunkedImage, const EntropyEncoded& encoded)
 				j++;
 			}
 			
-			// printf("TEST!!! sum = %d; j = %d; k = %d, chunkid = %d\n", curRleSum ,j , k, i+1);
-			
-			
-			// if (i+1 == 2) {
-				// int a = 0;
-				// int b = 0;
-				// std::pair<int, int> curRun;
-				// while (b < size*size && a < size*size && coefficientsACByChunk[a].first > -1) {
-					// curRun = coefficientsACByChunk[a];
-					// if (curRun.first > 15 && a == 0 && b == 0) {
-						// b++;
-						// a++;
-					// } else {
-						// for (int i = curRun.first; i > 0; i--) {
-							// b++;
-							// printf("zero found, b = %d\n", b);
-						// }
-						// b++;
-												// printf("val placed, b = %d\n", b);
-						// a++;
-					// }
-					
-				// }
-				// printf("final b = %d\n", b);	
-			// }
-			
 			coefficientsAC = rle::decoder(coefficientsACByChunk, size);
 			tempArray = unflattenArray(coefficientsAC, size);
 			populateChunk(tempArray, curChunk, size);
 			
-			// if (channel == 0 && i+1 == 1772) {
-				// printf("\n");
-				// for (int u = 0; u < size; u++) {
-					// printArray(curChunk[u].data(), size);
-				// }
-			// }
-			
-			// if (channel == 0 && i+1 == 587) {
-				// printf("\n");
-				// for (int u = 0; u < size; u++) {
-					// printArray(curChunk[u].data(), size);
-				// }
-			// }
 		}
 	}
 }
 
-void EntropyDecode(ChunkedImage& chunkedImage, const EntropyEncoded& encoded) {
+void EntropyDecodeHaar(ChunkedImage& chunkedImage, std::vector<int> encoded) {
+	
+	int numChunks = chunkedImage.getTotalChunks();
+	int size = chunkedImage.getChunkSize();
+	int predictionSize = 4;
+	int *encodedFlat = NULL;
+	int *decodedFlat = NULL;
+	std::vector<std::vector<int>> tempArray;
+	std::vector<std::vector<int>> curChunk;
+	
+	for (int channel = 0; channel < 3; channel++) {
+		for (int i = 0; i < numChunks; i++) {
+			curChunk = chunkedImage.getChunkAt(i)[channel];
+			
+			encodedFlat = encoded.data() + channel*numChunks*size*size + i*size*size;
+			decodedFlat = dpcm::decoder(encodedFlat, size*size, predictionSize);
+			tempArray = unflattenArray(std::vector<int>(decodedFlat, decodedFlat + size*size), size);
+			free(decodedFlat);
+			populateChunk(tempArray, curChunk, size);
+		}	
+	}
+}
+
+void EntropyDecode(ChunkedImage& chunkedImage, std::vector<int> encoded) {
 	
 	if (chunkedImage.getTransformSpace() == TransformSpace::DCT) {
-		EntropyDecodeDCT(chunkedImage, encoded);
-	} 
+		EntropyEncoded encodedDCT;
+		VecToEntropyEncode(encoded, encodedDCT, chunkedImage.getTotalChunks(), chunkedImage.getChunkSize());
+		EntropyDecodeDCT(chunkedImage, encodedDCT);
+	} else if (chunkedImage.getTransformSpace() == TransformSpace::Haar || chunkedImage.getTransformSpace() == TransformSpace::SP) {
+		EntropyDecodeHaar(chunkedImage, encoded);
+
+	}
 }
 
 #endif // ENTROPY_HPP

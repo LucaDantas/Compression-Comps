@@ -749,5 +749,3 @@ public:
 };
 
 #endif // IMAGE_LIB_HPP
-
-
