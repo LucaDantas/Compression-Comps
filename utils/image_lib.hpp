@@ -115,6 +115,10 @@ public:
         val[2] = b;
     }
 
+    void convertToYCbCrFromGrayscale() {
+        val[1] = val[2] = val[0];
+    }
+
     // Should only be called if the data space is YCbCr - managed by the Image class. Cannot convert back.
     void convertToGrayscale() {
 
@@ -199,6 +203,19 @@ public:
         for (int row = 0; row < rows; row++) {
             for (int col = 0; col < columns; col++) {
                 pixels[row][col].convertToYCbCr();
+            }
+        }
+        transformSpace = TransformSpace::Raw;
+        colorSpace = ColorSpace::YCbCr;
+    }
+
+    void convertToYCbCrFromGrayscale() {
+        assert(transformSpace == TransformSpace::Raw && "convertToYCbCr() can only be called when transformSpace is Raw");
+        assert(colorSpace == ColorSpace::Grayscale && "convertToYCbCrFromGraysale() can only be called when colorSpace is Grayscale");
+        
+        for (int row = 0; row < rows; row++) {
+            for (int col = 0; col < columns; col++) {
+                pixels[row][col].convertToYCbCrFromGrayscale();
             }
         }
         transformSpace = TransformSpace::Raw;
@@ -701,13 +718,13 @@ public:
 	
 	ChunkedImage applyQuantization(const ChunkedImage& chunkedImage, double scale) {
 		
-		// Check that the chunk size is 8x8
-        if (chunkedImage.getChunkSize() != 8) {
-            throw std::runtime_error(
-                "ChunkedImage chunk size (" + std::to_string(chunkedImage.getChunkSize()) + 
-                ") is not 8. Default quantizer currently only supports 8x8 chunks."
-            );
-        }
+		// // Check that the chunk size is 8x8
+        // if (chunkedImage.getChunkSize() != 8) {
+        //     throw std::runtime_error(
+        //         "ChunkedImage chunk size (" + std::to_string(chunkedImage.getChunkSize()) + 
+        //         ") is not 8. Default quantizer currently only supports 8x8 chunks."
+        //     );
+        // }
 		
         ChunkedImage result = chunkedImage.createFreshCopyForTransformResult(transformSpace);
 		
@@ -724,12 +741,12 @@ public:
 	
 	ChunkedImage applyInverseQuantization(const ChunkedImage& chunkedImage, double scale) {
 		
-        if (chunkedImage.getChunkSize() != 8) {
-            throw std::runtime_error(
-                "ChunkedImage chunk size (" + std::to_string(chunkedImage.getChunkSize()) + 
-                ") is not 8. Default quantizer currently only supports 8x8 chunks."
-            );
-        }
+        // if (chunkedImage.getChunkSize() != 8) {
+        //     throw std::runtime_error(
+        //         "ChunkedImage chunk size (" + std::to_string(chunkedImage.getChunkSize()) + 
+        //         ") is not 8. Default quantizer currently only supports 8x8 chunks."
+        //     );
+        // }
 		
         ChunkedImage result = chunkedImage.createFreshCopyForTransformResult(transformSpace);
 		

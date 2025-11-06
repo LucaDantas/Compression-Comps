@@ -538,7 +538,7 @@ public:
     void setQuantTable(const QTable& /*unused*/) { /* kept for API compatibility */ }
 
     // Quantize a single chunk (override of Transform::quantizeChunk)
-    void quantizeChunk(const Chunk& inputChunk, Chunk& outputChunk) override {
+    void quantizeChunk(const Chunk& inputChunk, Chunk& outputChunk, double scale) override {
       const int chunkSize = inputChunk.getChunkSize();
       const int W = chunkSize;
       const int H = chunkSize;
@@ -573,12 +573,12 @@ public:
         // write back (store ints)
         for (int y = 0; y < chunkSize; ++y)
           for (int x = 0; x < chunkSize; ++x)
-            outputChunk[ch][y][x] = plane[y * chunkSize + x];
+            outputChunk[ch][y][x] = plane[y * chunkSize + x] / scale;
       }
     }
 
     // Dequantize a single chunk (override of Transform::dequantizeChunk)
-    void dequantizeChunk(const Chunk& encodedChunk, Chunk& outputChunk) override {
+    void dequantizeChunk(const Chunk& encodedChunk, Chunk& outputChunk, double scale) override {
       const int chunkSize = encodedChunk.getChunkSize();
       const int W = chunkSize;
       const int H = chunkSize;
@@ -614,7 +614,7 @@ public:
 
         for (int y = 0; y < chunkSize; ++y)
           for (int x = 0; x < chunkSize; ++x)
-            outputChunk[ch][y][x] = plane[y * chunkSize + x];
+            outputChunk[ch][y][x] = plane[y * chunkSize + x] * scale;
       }
     }
 
