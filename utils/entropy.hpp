@@ -15,7 +15,7 @@ struct EntropyEncoded {
 };
 
 EntropyEncoded EntropyEncodeDCT(const ChunkedImage& chunkedImage);
-EntropyEncoded EntropyEncode(const ChunkedImage& chunkedImage);
+std::vector<int> EntropyEncode(const ChunkedImage& chunkedImage);
 void EntropyDecodeDCT(ChunkedImage& chunkedImage, const EntropyEncoded& encoded);
 void EntropyDecode(ChunkedImage& chunkedImage, const EntropyEncoded& encoded);
 
@@ -55,9 +55,7 @@ std::vector<int> EntropyEncodeToVec(const EntropyEncoded& encoded, int numChunks
 		
 		result.insert(result.end(), DCComponent[channel], DCComponent[channel] + numChunks);
 		
-		for (int i = 0; i < numChunks; i++) {
-			free(DCComponent[channel][i]);
-		}
+		free(DCComponent[channel]);
 		
 		result.push_back(ACComponent[channel].size());
 		
@@ -100,7 +98,7 @@ void VecToEntropyEncode(std::vector<int> encoded, EntropyEncoded& encodedDCT, in
 		ACSize = encoded[i];
 		i++;
 		
-		for (int j = i, j < i + 2*ACSize; j += 2) {
+		for (int j = i; j < i + 2*ACSize; j += 2) {
 			ACComponent[channel].push_back(std::make_pair(encoded[i+j], encoded[i+j+1]));
 		}
 		
@@ -108,8 +106,8 @@ void VecToEntropyEncode(std::vector<int> encoded, EntropyEncoded& encodedDCT, in
 		
 	}
 	
-	encoded.DCComponent = DCComponent;
-	encoded.ACComponent = ACComponent;
+	encodedDCT.DCComponent = DCComponent;
+	encodedDCT.ACComponent = ACComponent;
 	
 }
 
@@ -159,6 +157,7 @@ std::vector<int> EntropyEncodeHaar(const ChunkedImage& chunkedImage) {
 	int size = chunkedImage.getChunkSize();
 	int predictionSize = 4;
 	int *predictedResult = NULL;
+	const std::vector<int> *curChunk = NULL;
 	std::vector<int> result;
 	result.push_back(numChunks);
 	result.push_back(size);
@@ -270,6 +269,7 @@ void EntropyDecodeHaar(ChunkedImage& chunkedImage, std::vector<int> encoded) {
 	int *encodedFlat = NULL;
 	int *decodedFlat = NULL;
 	std::vector<std::vector<int>> tempArray;
+	std::vector<std::vector<int>> curChunk;
 	
 	for (int channel = 0; channel < 3; channel++) {
 		for (int i = 0; i < numChunks; i++) {
