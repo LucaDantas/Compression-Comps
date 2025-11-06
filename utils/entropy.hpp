@@ -29,15 +29,24 @@ void populateVector(const std::vector<std::pair<int, int>>& arr, std::vector<std
 	
 }
 
-void populateChunk(const std::vector<std::vector<int>>& arr, std::vector<std::vector<int>>& chunk, int size) {
+void populateChunk(const std::vector<std::vector<int>>& arr, std::vector<std::vector<int>>* chunk, int size) {
 	
 	for (int i = 0; i < size; i++) {
 		for (int j = 0; j < size; j++) {
 			if (i == 0 && j == 0) {
 				continue;
 			} else {
-				chunk[i][j] = arr[i][j];
+				(*chunk)[i][j] = arr[i][j];
 			}
+		}
+	}
+}
+
+void populateChunkFull(const std::vector<std::vector<int>>& arr, std::vector<std::vector<int>>* chunk, int size) {
+	
+	for (int i = 0; i < size; i++) {
+		for (int j = 0; j < size; j++) {
+			(*chunk)[i][j] = arr[i][j];
 		}
 	}
 }
@@ -226,7 +235,7 @@ void EntropyDecodeDCT(ChunkedImage& chunkedImage, const EntropyEncoded& encoded)
 	std::vector<int *> DCComponent = encoded.DCComponent;
 	std::vector<std::vector<std::pair<int, int>>> ACComponent = encoded.ACComponent;
 	
-	std::vector<std::vector<int>> curChunk;
+	std::vector<std::vector<int>> *curChunk;
 		
 	for (int channel = 0; channel < 3; channel++) {
 
@@ -241,7 +250,7 @@ void EntropyDecodeDCT(ChunkedImage& chunkedImage, const EntropyEncoded& encoded)
 		free(DCComponent[channel]);
 		
 		for (int i = 0; i < numChunks; i++) {
-			curChunk = chunkedImage.getChunkAt(i)[channel];
+			curChunk = &chunkedImage.getChunkAt(i)[channel];
 
 			j = 0;
 			curRleSum = 0;
@@ -269,17 +278,17 @@ void EntropyDecodeHaar(ChunkedImage& chunkedImage, std::vector<int> encoded) {
 	int *encodedFlat = NULL;
 	int *decodedFlat = NULL;
 	std::vector<std::vector<int>> tempArray;
-	std::vector<std::vector<int>> curChunk;
+	std::vector<std::vector<int>> *curChunk;
 	
 	for (int channel = 0; channel < 3; channel++) {
 		for (int i = 0; i < numChunks; i++) {
-			curChunk = chunkedImage.getChunkAt(i)[channel];
+			curChunk = &chunkedImage.getChunkAt(i)[channel];
 			
-			encodedFlat = encoded.data() + channel*numChunks*size*size + i*size*size;
+			encodedFlat = encoded.data() + 3 + channel*numChunks*size*size + i*size*size;
 			decodedFlat = dpcm::decoder(encodedFlat, size*size, predictionSize);
 			tempArray = unflattenArray(std::vector<int>(decodedFlat, decodedFlat + size*size), size);
 			free(decodedFlat);
-			populateChunk(tempArray, curChunk, size);
+			populateChunkFull(tempArray, curChunk, size);
 		}	
 	}
 }
