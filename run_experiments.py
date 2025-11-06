@@ -12,7 +12,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import List, Tuple, Dict
 
 # Configuration
-QUANTIZATION_SCALES = [i for i in range(1, 31)]
+QUANTIZATION_SCALES = [i for i in range(1, 21)]
 TRANSFORMS = ["SP", "HAAR", "DCT", "DFT"]
 DATASETS_DIR = "Datasets"
 EXECUTABLE = "./pipeline_data_collection"
@@ -107,6 +107,8 @@ def main():
     
     # Find all images
     images = find_all_images()
+    for a, b in images[:5]:
+        print(a, b)
     print(f"Found {len(images)} images across all datasets")
     
     if len(images) == 0:
@@ -117,7 +119,9 @@ def main():
     tasks = []
     for transform in TRANSFORMS:
         for dataset_name, image_path in images:
-            if dataset_name == "SquaredKodak" and image_path == "1.png":
+            if dataset_name == "SquaredIconsSample" and int(image_path[-5]) > 50:
+                continue
+            if dataset_name == "SquaredKodak" and image_path[-5] == "1":
                 save_flag = f"results/{transform}/Kodak1quantization="
             else:
                 save_flag = "no_save"
