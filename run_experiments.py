@@ -11,9 +11,15 @@ from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import List, Tuple, Dict
 import re
+from wakepy import keep
 
 # Configuration
-QUANTIZATION_SCALES = [i for i in range(1, 21)]
+QUANTIZATION_SCALES = {
+    "SP": [i for i in range(1, 21)],
+    "HAAR": [i for i in range(1, 251, 5)],
+    "DCT": [i for i in range(1, 21)] + [i / 10 for i in range(5, 10)],
+    "DFT": [i for i in range(1, 201, 5)]
+}
 TRANSFORMS = ["SP", "HAAR", "DCT", "DFT"]
 DATASETS_DIR = "Datasets"
 EXECUTABLE = "./pipeline_data_collection"
@@ -124,12 +130,8 @@ def main():
     tasks = []
     for transform in TRANSFORMS:
         for dataset_name, image_path in images:
-            if dataset_name == "SquaredKodak" and image_path[-5] == "1":
-                save_flag = f"results/{transform}/Kodak1quantization="
-            else:
-                save_flag = "no_save"
-            for quant_scale in QUANTIZATION_SCALES:
-                tasks.append((transform, dataset_name, image_path, quant_scale, save_flag))
+            for quant_scale in QUANTIZATION_SCALES[transform]:
+                tasks.append((transform, dataset_name, image_path, quant_scale, "no_save"))
     
     print(f"Total tasks: {len(tasks)} (4 transforms × {len(images)} images)")
     
@@ -158,7 +160,7 @@ def main():
     print(f"\nCompleted all {len(tasks)} tasks")
     
     # Write results to CSV files
-    csv_filename = os.path.join(RESULTS_DIR, "experiment_results.csv")
+    csv_filename = os.path.join(RESULTS_DIR, "extended_experiment_results.csv")
     results = sorted(results, 
                     key=lambda x: (x["dataset"], x["image_path"], x["transform"]))
     
@@ -193,5 +195,6 @@ def main():
     return 0
 
 if __name__ == "__main__":
-    exit(main())
+    with keep.running(on_fail="warn"):
+        exit(main())
 
