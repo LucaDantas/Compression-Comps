@@ -10,6 +10,7 @@ import csv
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import List, Tuple, Dict
+import re
 
 # Configuration
 QUANTIZATION_SCALES = [i for i in range(1, 21)]
@@ -35,6 +36,12 @@ def find_all_images() -> List[Tuple[str, str]]:
             dataset_name = dataset_dir.name
             for image_file in dataset_dir.glob("*.png"):
                 image_path = str(image_file)
+                print(dataset_name, image_path)
+                match = re.search(r"[\d]+.png", image_path)
+                if match:
+                    num = int(match.group()[:-4])
+                if dataset_name == "SquaredIconsSample" and num > 50:
+                    continue
                 images.append((dataset_name, image_path))
     
     return sorted(images)
@@ -107,8 +114,6 @@ def main():
     
     # Find all images
     images = find_all_images()
-    for a, b in images[:5]:
-        print(a, b)
     print(f"Found {len(images)} images across all datasets")
     
     if len(images) == 0:
@@ -119,8 +124,6 @@ def main():
     tasks = []
     for transform in TRANSFORMS:
         for dataset_name, image_path in images:
-            if dataset_name == "SquaredIconsSample" and int(image_path[-5]) > 50:
-                continue
             if dataset_name == "SquaredKodak" and image_path[-5] == "1":
                 save_flag = f"results/{transform}/Kodak1quantization="
             else:
@@ -138,7 +141,7 @@ def main():
         # Submit all tasks
         future_to_task = {
             executor.submit(run_pipeline, transform, image_path, quant_scale, save_flag): (transform, dataset_name, image_path, quant_scale, save_flag)
-            for transform, dataset_name, image_path, quant_scale, save_flag in tasks[:20] # SAMPLE TOGGLE
+            for transform, dataset_name, image_path, quant_scale, save_flag in tasks
         }
         
         # Collect results as they complete
