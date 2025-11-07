@@ -147,9 +147,9 @@ int main(int argc, char* argv[]) {
     double psnr = metrics::PSNR(originalImg, resultImg);
 
     if (outPath != "no_save") {
-        resultImg.saveAsPNG(outPath + std::to_string(static_cast<int>(scale)) + ".png");
+        resultImg.saveAsPNG(outPath + std::to_string(compressionRatio) + ".png");
         Image diffImg = imageDiff(originalImg, resultImg);
-        diffImg.saveAsPNG(outPath + std::to_string(static_cast<int>(scale)) + "diff.png");
+        diffImg.saveAsPNG(outPath + std::to_string(compressionRatio) + "diff.png");
     }
     
     // Delete temporary file

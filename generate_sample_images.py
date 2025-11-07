@@ -13,7 +13,7 @@ from typing import List, Tuple, Dict
 import re
 
 # Configuration
-QUANTIZATION_SCALES = [i for i in range(1, 11, 2)]
+QUANTIZATION_SCALES = [i for i in range(1, 31, 2)]
 TRANSFORMS = ["SP", "HAAR", "DCT", "DFT"]
 IMAGE = "Datasets/SquaredKodak/1.png"
 EXECUTABLE = "./pipeline_data_collection"
@@ -45,7 +45,7 @@ def main():
     tasks = []
     for transform in TRANSFORMS:
         for quant_scale in QUANTIZATION_SCALES:
-            save_flag = os.path.join(RESULTS_DIR, f"{transform}_quantization=")
+            save_flag = os.path.join(RESULTS_DIR, f"{transform}_compressionRatio=")
             tasks.append((transform, IMAGE, quant_scale, save_flag))
     
     
