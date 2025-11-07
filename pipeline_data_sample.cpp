@@ -22,7 +22,7 @@
 
 int main(int argc, char* argv[]) {
     if (argc < 4) {
-        std::cerr << "Usage: " << argv[0] << " <transform_name> <image_path> <quant_scale> <img_path>" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " <transform_name> <image_path> <quant_scale>" << std::endl;
         std::cerr << "Example: " << argv[0] << " DCT Datasets/SquaredKodak/1.png 2.0 1" << std::endl;
         std::cerr << "\nAvailable transforms: DCT, SP, HAAR, DFT" << std::endl;
         return 1;
@@ -32,7 +32,6 @@ int main(int argc, char* argv[]) {
     std::transform(transformName.begin(), transformName.end(), transformName.begin(), ::toupper);
     std::string imagePath = argv[2];
     double scale = std::strtod(argv[3], nullptr);
-    std::string outPath = argv[4];
     
     // ============================================================================
     // ENCODING PIPELINE
@@ -146,11 +145,9 @@ int main(int argc, char* argv[]) {
     double mse = metrics::MSE(originalImg, resultImg);
     double psnr = metrics::PSNR(originalImg, resultImg);
 
-    if (outPath != "no_save") {
-        resultImg.saveAsPNG(outPath + std::to_string(static_cast<int>(scale)) + ".png");
-        Image diffImg = imageDiff(originalImg, resultImg);
-        diffImg.saveAsPNG(outPath + std::to_string(static_cast<int>(scale)) + "diff.png");
-    }
+    resultImg.saveAsPNG("decodedImage.png");
+    Image diffImg = imageDiff(originalImg, resultImg);
+    diffImg.saveAsPNG("differenceImage.png");
     
     // Delete temporary file
     std::filesystem::remove(tempFile);
