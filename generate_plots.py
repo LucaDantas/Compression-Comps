@@ -41,7 +41,7 @@ def generate_parametric_plot(df, transform_name="All"):
     plt.figure(figsize=GLOBAL_FIGSIZE)
     
     # Use lineplot to connect the points for each (dataset, transform) group
-    sns.lineplot(
+    ax = sns.lineplot(
         data=avg_df,
         x='compression_ratio',
         y='psnr',
@@ -62,7 +62,43 @@ def generate_parametric_plot(df, transform_name="All"):
     plt.ylabel('Average PSNR (dB)', fontsize=30, labelpad=20)
     plt.xticks(fontsize=24) # Increase tick label size
     plt.yticks(fontsize=24) # Increase tick label size
-    plt.legend(title='Experiment Group' if transform_name == "All" else 'Dataset', bbox_to_anchor=(1.05, 1), loc='upper right', fontsize=24, markerscale=2.0, title_fontsize=24)
+    # current_xlim = plt.xlim()
+    current_ylim = plt.ylim()
+    # plt.xlim(current_xlim[0], current_xlim[1] * 1.1)
+    plt.ylim(current_ylim[0], current_ylim[1] * 1.2)
+    if transform_name == "All":
+        # "All" plot: has complex hue/style legend. We must filter out titles.
+        handles, labels = ax.get_legend_handles_labels()
+        
+        # Rebuild lists, skipping the labels that are seaborn's titles
+        new_handles = []
+        new_labels = []
+        for i, label in enumerate(labels):
+            if label != 'dataset' and label != 'transform':
+                new_handles.append(handles[i])
+                new_labels.append(labels[i])
+        
+        # Use the filtered lists for the legend
+        ax.legend(
+            handles=new_handles,
+            labels=new_labels,
+            loc='upper right', 
+            bbox_to_anchor=(0.98, 0.98),
+            fontsize=24, 
+            markerscale=2.0, 
+            frameon=False,
+            ncol=2
+        )
+    else:
+        # Per-transform plot: has simple legend, no title issue.
+        plt.legend(
+            loc='upper right', 
+            bbox_to_anchor=(0.98, 0.98),
+            fontsize=24, 
+            markerscale=2.0, 
+            frameon=False,
+            ncol=1
+        )
     plt.grid(True, linestyle='--', alpha=0.6)
     # plt.tight_layout()
     
@@ -82,7 +118,7 @@ def generate_scatter_plot(df, transform_name="All"):
         output_filename = 'plot_2_full_scatter_All.png'
 
     plt.figure(figsize=GLOBAL_FIGSIZE)
-    sns.scatterplot(
+    ax = sns.scatterplot(
         data=df,
         x='compression_ratio',
         y='psnr',
@@ -101,7 +137,43 @@ def generate_scatter_plot(df, transform_name="All"):
     plt.ylabel('PSNR (dB)', fontsize=30, labelpad=20)
     plt.xticks(fontsize=24) # Increase tick label size
     plt.yticks(fontsize=24) # Increase tick label size
-    plt.legend(title='Experiment Parameters' if transform_name == "All" else 'Dataset', bbox_to_anchor=(1.05, 1), loc='upper right', fontsize=24, markerscale=2.0, title_fontsize=24)
+    # current_xlim = plt.xlim()
+    current_ylim = plt.ylim()
+    # plt.xlim(current_xlim[0], current_xlim[1] * 1.1)
+    plt.ylim(current_ylim[0], current_ylim[1] * 1.2)
+    if transform_name == "All":
+        # "All" plot: has complex hue/style legend. We must filter out titles.
+        handles, labels = ax.get_legend_handles_labels()
+        
+        # Rebuild lists, skipping the labels that are seaborn's titles
+        new_handles = []
+        new_labels = []
+        for i, label in enumerate(labels):
+            if label != 'dataset' and label != 'transform':
+                new_handles.append(handles[i])
+                new_labels.append(labels[i])
+        
+        # Use the filtered lists for the legend
+        ax.legend(
+            handles=new_handles,
+            labels=new_labels,
+            loc='upper right', 
+            bbox_to_anchor=(0.98, 0.98),
+            fontsize=24, 
+            markerscale=2.0, 
+            frameon=False,
+            ncol=2
+        )
+    else:
+        # Per-transform plot: has simple legend, no title issue.
+        plt.legend(
+            loc='upper right', 
+            bbox_to_anchor=(0.98, 0.98),
+            fontsize=24, 
+            markerscale=2.0, 
+            frameon=False,
+            ncol=1
+        )
     plt.grid(True, linestyle='--', alpha=0.6)
     # plt.tight_layout()
 
@@ -191,7 +263,7 @@ def generate_binned_boxplots(df):
         plt.xticks(fontsize=24) # Increase tick label size
         plt.yticks(fontsize=24) # Increase tick label size
 
-        plt.legend(title='Transform', bbox_to_anchor=(1.05, 1), loc='upper right', fontsize=24, markerscale=2.0, title_fontsize=24)
+        plt.legend(title='Transform', bbox_to_anchor=(0.98, 0.98), loc='best', fontsize=24, markerscale=2.0, title_fontsize=24, frameon=False)
         plt.grid(axis='y', linestyle='--', alpha=0.7)
         # plt.tight_layout()
         
@@ -259,7 +331,7 @@ def generate_binned_bar_plots(df):
         #                   textcoords='offset points',
         #                   fontsize=9)
 
-        plt.legend(title='Transform', bbox_to_anchor=(1.05, 1), loc='upper right', fontsize=24, markerscale=2.0, title_fontsize=24)
+        plt.legend(title='Transform', bbox_to_anchor=(0.98, 0.98), loc='best', fontsize=24, markerscale=2.0, title_fontsize=24, frameon=False)
         plt.grid(axis='y', linestyle='--', alpha=0.7)
         # plt.tight_layout()
         
