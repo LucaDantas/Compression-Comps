@@ -83,6 +83,29 @@ int main(int argc, char* argv[]) {
     quantizedImg = transform->applyQuantization(transformedImg, scale);
     double quantizedEntropy = Image(quantizedImg).getEntropy();
     
+    // Calculate original image size in memory (RGB, 8 bits per channel)
+    std::size_t originalSizeBytes = static_cast<std::size_t>(originalImg.getRows()) * 
+                                     originalImg.getColumns() * ((transformName == "DFT") ? 1 : 3);
+    
+    // Direct Huffman encoding of quantized image (bypassing entropy coding)
+    Image quantizedImage(quantizedImg);
+    std::vector<int> directPixelData;
+    directPixelData.reserve(quantizedImage.getRows() * quantizedImage.getColumns() * 3);
+    for (int row = 0; row < quantizedImage.getRows(); row++) {
+        for (int col = 0; col < quantizedImage.getColumns(); col++) {
+            const Pixel& pixel = quantizedImage.getPixel(row, col);
+            for (int ch = 0; ch < 3; ch++) {
+                directPixelData.push_back(pixel[ch]);
+            }
+        }
+    }
+    HuffmanEncoder directHuffmanEncoder;
+    std::vector<int> directHuffmanEncoded = directHuffmanEncoder.getEncoding(directPixelData);
+    std::string directTempFile = "/tmp/direct_compressed_temp_" + std::to_string(getpid()) + ".bin";
+    writeVectorToFile(directHuffmanEncoded, directTempFile);
+    std::size_t directCompressedSizeBytes = std::filesystem::file_size(directTempFile);
+    double directCompressionRatio = static_cast<double>(originalSizeBytes) / static_cast<double>(directCompressedSizeBytes);
+    
     // Apply entropy coding (returns vector<int> directly, handles serialization)
     std::vector<int> entropyEncoded = EntropyEncode(quantizedImg);
     
@@ -93,10 +116,6 @@ int main(int argc, char* argv[]) {
     // Write to binary temporary file
     std::string tempFile = "/tmp/compressed_temp_" + std::to_string(getpid()) + ".bin";
     writeVectorToFile(huffmanEncoded, tempFile);
-    
-    // Calculate original image size in memory (RGB, 8 bits per channel)
-    std::size_t originalSizeBytes = static_cast<std::size_t>(originalImg.getRows()) * 
-                                     originalImg.getColumns() * ((transformName == "DFT") ? 1 : 3);
     
     // Calculate compressed file size
     std::size_t compressedSizeBytes = std::filesystem::file_size(tempFile);
@@ -152,12 +171,14 @@ int main(int argc, char* argv[]) {
         diffImg.saveAsPNG(outPath + std::to_string(compressionRatio) + "diff.png");
     }
     
-    // Delete temporary file
+    // Delete temporary files
     std::filesystem::remove(tempFile);
+    std::filesystem::remove(directTempFile);
     
-    // Output exactly in the specified format: (compression ratio, entropy quantized, mse, psnr, encoding time, decoding time)
+    // Output exactly in the specified format: (compression ratio, direct compression ratio, entropy quantized, mse, psnr, encoding time, decoding time)
     std::cout << "(" 
               << compressionRatio << ", "
+              << directCompressionRatio << ", "
               << quantizedEntropy << ", "
               << mse << ", "
               << psnr << ", "
