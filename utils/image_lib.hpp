@@ -115,9 +115,18 @@ public:
         val[2] = b;
     }
 
+    void convertToRGBFromGrayscale() {
+        val[1] = val[2] = val[0];
+    }
+
     // Should only be called if the data space is YCbCr - managed by the Image class. Cannot convert back.
     void convertToGrayscale() {
+        int r = val[0], g = val[1], b = val[2];
+        
+        // Standard RGB to YCbCr conversion as defined in the paper JPEG FIF
+        int y = (int)(0.299 * r + 0.587 * g + 0.114 * b);
 
+        val[0] = y;
         val[1] = 0;
         val[2] = 0;
     }
@@ -205,9 +214,22 @@ public:
         colorSpace = ColorSpace::YCbCr;
     }
 
+    void convertToRGBFromGrayscale() {
+        assert(transformSpace == TransformSpace::Raw && "convertToYCbCr() can only be called when transformSpace is Raw");
+        assert(colorSpace == ColorSpace::Grayscale && "convertToRGBFromGraysale() can only be called when colorSpace is Grayscale");
+        
+        for (int row = 0; row < rows; row++) {
+            for (int col = 0; col < columns; col++) {
+                pixels[row][col].convertToRGBFromGrayscale();
+            }
+        }
+        transformSpace = TransformSpace::Raw;
+        colorSpace = ColorSpace::RGB;
+    }
+
     void convertToGrayscale() {
         assert(transformSpace == TransformSpace::Raw && "convertToGrayscale() can only be called when transformSpace is Raw");
-        assert(colorSpace == ColorSpace::YCbCr && "convertToGrayscale() can only be called when colorSpace is YCbCr");
+        assert(colorSpace == ColorSpace::RGB && "convertToGrayscale() can only be called when colorSpace is RGB");
 
         for (int row = 0; row < rows; row++) {
             for (int col = 0; col < columns; col++) {
@@ -619,7 +641,7 @@ protected:
 			for (int u = 0; u < size; u++) {
 				for (int v = 0; v < size; v++) {
 					inputValue = inputChunk[ch][u][v];
-					matrixValue = quantizationMatrix[u][v] / scale;
+					matrixValue = quantizationMatrix[u][v] * scale;
 					result = std::round(inputValue / matrixValue);
 					outputChunk[ch][u][v] = result;
 				}
@@ -701,13 +723,13 @@ public:
 	
 	ChunkedImage applyQuantization(const ChunkedImage& chunkedImage, double scale) {
 		
-		// Check that the chunk size is 8x8
-        if (chunkedImage.getChunkSize() != 8) {
-            throw std::runtime_error(
-                "ChunkedImage chunk size (" + std::to_string(chunkedImage.getChunkSize()) + 
-                ") is not 8. Default quantizer currently only supports 8x8 chunks."
-            );
-        }
+		// // Check that the chunk size is 8x8
+        // if (chunkedImage.getChunkSize() != 8) {
+        //     throw std::runtime_error(
+        //         "ChunkedImage chunk size (" + std::to_string(chunkedImage.getChunkSize()) + 
+        //         ") is not 8. Default quantizer currently only supports 8x8 chunks."
+        //     );
+        // }
 		
         ChunkedImage result = chunkedImage.createFreshCopyForTransformResult(transformSpace);
 		
@@ -724,12 +746,12 @@ public:
 	
 	ChunkedImage applyInverseQuantization(const ChunkedImage& chunkedImage, double scale) {
 		
-        if (chunkedImage.getChunkSize() != 8) {
-            throw std::runtime_error(
-                "ChunkedImage chunk size (" + std::to_string(chunkedImage.getChunkSize()) + 
-                ") is not 8. Default quantizer currently only supports 8x8 chunks."
-            );
-        }
+        // if (chunkedImage.getChunkSize() != 8) {
+        //     throw std::runtime_error(
+        //         "ChunkedImage chunk size (" + std::to_string(chunkedImage.getChunkSize()) + 
+        //         ") is not 8. Default quantizer currently only supports 8x8 chunks."
+        //     );
+        // }
 		
         ChunkedImage result = chunkedImage.createFreshCopyForTransformResult(transformSpace);
 		

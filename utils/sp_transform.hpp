@@ -307,12 +307,12 @@ public:
   // Quantization parameterization
   struct QuantParams {
     int q_LL = 1;   // base LL step
-    int q_HL = 4;   // base HL step
-    int q_LH = 4;   // base LH step
-    int q_HH = 6;   // base HH step
-    int deadzone = 1; // dead-zone multiplier
+    int q_HL = 2;   // base HL step
+    int q_LH = 2;   // base LH step
+    int q_HH = 4;   // base HH step
+    int deadzone = 0; // dead-zone multiplier
     float scale = 1.0f; // global scale
-    float level_gamma = 1.0f; // geometric per-level multiplier
+    float level_gamma = 0.8f; // geometric per-level multiplier
     QuantParams() = default;
   };
 
@@ -538,7 +538,7 @@ public:
     void setQuantTable(const QTable& /*unused*/) { /* kept for API compatibility */ }
 
     // Quantize a single chunk (override of Transform::quantizeChunk)
-    void quantizeChunk(const Chunk& inputChunk, Chunk& outputChunk) override {
+    void quantizeChunk(const Chunk& inputChunk, Chunk& outputChunk, double scale) override {
       const int chunkSize = inputChunk.getChunkSize();
       const int W = chunkSize;
       const int H = chunkSize;
@@ -573,12 +573,12 @@ public:
         // write back (store ints)
         for (int y = 0; y < chunkSize; ++y)
           for (int x = 0; x < chunkSize; ++x)
-            outputChunk[ch][y][x] = plane[y * chunkSize + x];
+            outputChunk[ch][y][x] = plane[y * chunkSize + x] / scale;
       }
     }
 
     // Dequantize a single chunk (override of Transform::dequantizeChunk)
-    void dequantizeChunk(const Chunk& encodedChunk, Chunk& outputChunk) override {
+    void dequantizeChunk(const Chunk& encodedChunk, Chunk& outputChunk, double scale) override {
       const int chunkSize = encodedChunk.getChunkSize();
       const int W = chunkSize;
       const int H = chunkSize;
@@ -614,7 +614,7 @@ public:
 
         for (int y = 0; y < chunkSize; ++y)
           for (int x = 0; x < chunkSize; ++x)
-            outputChunk[ch][y][x] = plane[y * chunkSize + x];
+            outputChunk[ch][y][x] = plane[y * chunkSize + x] * scale;
       }
     }
 

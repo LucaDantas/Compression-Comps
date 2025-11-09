@@ -29,7 +29,7 @@ void createEncodedVisualization(const Image& encodedImg, const std::string& save
 ChunkedImage applyInverseTransform(Transform* transform, const ChunkedImage& encodedResult, const std::string& transformType);
 void saveDecodedImage(const Image& decodedImg, const std::string& saveDir);
 void computeAndAnalyzeDifference(const Image& originalImg, const Image& decodedImg, const std::string& saveDir, int chunkSize);
-void printEntropySummary(double originalEntropy, double encodedEntropy, double decodedEntropy, const std::string& transformType);
+void printEntropySummary(double originalEntropy, double encodedEntropy, double quantizedEntropy, double decodedEntropy, const std::string& transformType);
 
 int main(int argc, char* argv[]) {
     // Parse command line arguments
@@ -61,19 +61,34 @@ int main(int argc, char* argv[]) {
     Transform* transform = createTransform(args.transformType);
     ChunkedImage encodedResult = applyTransform(transform, chunkedImg, args.transformType);
     
-    // Calculate entropy of encoded image
+    // Calculate entropy of encoded image (before quantization)
     Image encodedImg(encodedResult);
     double encodedEntropy = encodedImg.getEntropy();
-    std::cout << "Encoded image entropy: " << encodedEntropy << " bits per pixel" << std::endl;
+    std::cout << "Encoded image entropy (before quantization): " << encodedEntropy << " bits per pixel" << std::endl;
     
-    // Analyze encoded image
-    analyzeEncodedImage(encodedResult, encodedImg, args.chunkSize);
+    // Apply quantization with scale 1
+    std::cout << "\nApplying quantization with scale 1..." << std::endl;
+    ChunkedImage quantizedResult = transform->applyQuantization(encodedResult, 1.0);
+    std::cout << "Quantization applied successfully!" << std::endl;
     
-    // Create visualization
-    createEncodedVisualization(encodedImg, saveDir);
+    // Calculate entropy of quantized image
+    Image quantizedImg(quantizedResult);
+    double quantizedEntropy = quantizedImg.getEntropy();
+    std::cout << "Quantized image entropy: " << quantizedEntropy << " bits per pixel" << std::endl;
+    
+    // Analyze encoded image (using quantized result)
+    analyzeEncodedImage(quantizedResult, quantizedImg, args.chunkSize);
+    
+    // Create visualization (using quantized result)
+    createEncodedVisualization(quantizedImg, saveDir);
+    
+    // Apply inverse quantization with scale 1
+    std::cout << "\nApplying inverse quantization with scale 1..." << std::endl;
+    ChunkedImage dequantizedResult = transform->applyInverseQuantization(quantizedResult, 1.0);
+    std::cout << "Inverse quantization applied successfully!" << std::endl;
     
     // Apply inverse transform
-    ChunkedImage decodedResult = applyInverseTransform(transform, encodedResult, args.transformType);
+    ChunkedImage decodedResult = applyInverseTransform(transform, dequantizedResult, args.transformType);
     
     // Calculate entropy of decoded image
     Image decodedImg(decodedResult);
@@ -87,7 +102,7 @@ int main(int argc, char* argv[]) {
     computeAndAnalyzeDifference(img, decodedImg, saveDir, args.chunkSize);
     
     // Print entropy summary
-    printEntropySummary(originalEntropy, encodedEntropy, decodedEntropy, args.transformType);
+    printEntropySummary(originalEntropy, encodedEntropy, quantizedEntropy, decodedEntropy, args.transformType);
     
     std::cout << "\n" << args.transformType << " Transform test completed successfully!" << std::endl;
     
@@ -488,14 +503,14 @@ void createEncodedVisualization(const Image& encodedImg, const std::string& save
         }
     }
     
-    // Calculate 1% and 99% percentiles for scaling
-    int percentile1[3], percentile99[3];
+    // Calculate 10% and 90% percentiles for scaling
+    int percentile10[3], percentile90[3];
     const char* channelNames[] = {"Red", "Green", "Blue"};
     for (int ch = 0; ch < 3; ch++) {
         std::sort(channelValues[ch].begin(), channelValues[ch].end());
         int n = channelValues[ch].size();
-        percentile1[ch] = channelValues[ch][static_cast<int>(n * 0.01)];
-        percentile99[ch] = channelValues[ch][static_cast<int>(n * 0.99)];
+        percentile10[ch] = channelValues[ch][static_cast<int>(n * 0.10)];
+        percentile90[ch] = channelValues[ch][static_cast<int>(n * 0.90)];
     }
     
     // Create visualization image by copying the encoded image
@@ -506,16 +521,16 @@ void createEncodedVisualization(const Image& encodedImg, const std::string& save
             for (int ch = 0; ch < 3; ch++) {
                 int val = encodedImg.getPixel(row, col)[ch];
                 
-                // Scale to 0-255 range using 1%-99% percentiles
-                if (percentile99[ch] == percentile1[ch]) {
+                // Scale to 0-255 range using 10%-90% percentiles
+                if (percentile90[ch] == percentile10[ch]) {
                     // Avoid division by zero
                     encodedVisImg.getPixel(row, col)[ch] = 128;
                 } else {
                     // Clamp to percentile range first
-                    val = std::max(percentile1[ch], std::min(percentile99[ch], val));
+                    val = std::max(percentile10[ch], std::min(percentile90[ch], val));
                     
                     // Scale to 0-255
-                    double scaled = (double)(val - percentile1[ch]) / (percentile99[ch] - percentile1[ch]);
+                    double scaled = (double)(val - percentile10[ch]) / (percentile90[ch] - percentile10[ch]);
                     encodedVisImg.getPixel(row, col)[ch] = static_cast<int>(scaled * 255);
                 }
             }
@@ -528,7 +543,7 @@ void createEncodedVisualization(const Image& encodedImg, const std::string& save
         std::cout << "Encoded image visualization saved successfully as " << encodedVisPath << std::endl;
         std::cout << "Scaling info:" << std::endl;
         for (int ch = 0; ch < 3; ch++) {
-            std::cout << "  " << channelNames[ch] << " channel: [" << percentile1[ch] << ", " << percentile99[ch] << "] -> [0, 255]" << std::endl;
+            std::cout << "  " << channelNames[ch] << " channel: [" << percentile10[ch] << ", " << percentile90[ch] << "] -> [0, 255]" << std::endl;
         }
     } else {
         std::cout << "Failed to save encoded image visualization" << std::endl;
@@ -720,12 +735,14 @@ void computeAndAnalyzeDifference(const Image& originalImg, const Image& decodedI
     }
 }
 
-void printEntropySummary(double originalEntropy, double encodedEntropy, double decodedEntropy, const std::string& transformType) {
+void printEntropySummary(double originalEntropy, double encodedEntropy, double quantizedEntropy, double decodedEntropy, const std::string& transformType) {
     std::cout << "\n=== ENTROPY SUMMARY ===" << std::endl;
     std::cout << "Original image entropy:  " << originalEntropy << " bits per pixel" << std::endl;
     std::cout << "Encoded image entropy:   " << encodedEntropy << " bits per pixel" << std::endl;
+    std::cout << "Quantized image entropy: " << quantizedEntropy << " bits per pixel" << std::endl;
     std::cout << "Decoded image entropy:   " << decodedEntropy << " bits per pixel" << std::endl;
-    std::cout << "Entropy change (orig->enc): " << (encodedEntropy - originalEntropy) << " bits per pixel" << std::endl;
-    std::cout << "Entropy change (enc->dec):  " << (decodedEntropy - encodedEntropy) << " bits per pixel" << std::endl;
-    std::cout << "Entropy change (orig->dec): " << (decodedEntropy - originalEntropy) << " bits per pixel" << std::endl;
+    std::cout << "Entropy change (orig->enc):     " << (encodedEntropy - originalEntropy) << " bits per pixel" << std::endl;
+    std::cout << "Entropy change (enc->quant):    " << (quantizedEntropy - encodedEntropy) << " bits per pixel" << std::endl;
+    std::cout << "Entropy change (quant->dec):    " << (decodedEntropy - quantizedEntropy) << " bits per pixel" << std::endl;
+    std::cout << "Entropy change (orig->dec):     " << (decodedEntropy - originalEntropy) << " bits per pixel" << std::endl;
 }

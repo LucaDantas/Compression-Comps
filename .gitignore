@@ -10,3 +10,6 @@ simple_pipeline_verbose
 # Other generated files
 decodedImage.png
 differenceImage.png
+
+# Notebooks
+.ipynb

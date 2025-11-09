@@ -205,7 +205,7 @@ std::vector<int> EntropyEncode(const ChunkedImage& chunkedImage) {
 	
 	std::vector<int> result;
 	
-	if (chunkedImage.getTransformSpace() == TransformSpace::DCT) {
+	if (chunkedImage.getTransformSpace() == TransformSpace::DCT || chunkedImage.getTransformSpace() == TransformSpace::DFT) {
 		EntropyEncoded resultInitial;
 		resultInitial = EntropyEncodeDCT(chunkedImage);
 		result = EntropyEncodeToVec(resultInitial, chunkedImage.getTotalChunks(), chunkedImage.getChunkSize());
@@ -295,7 +295,7 @@ void EntropyDecodeHaar(ChunkedImage& chunkedImage, std::vector<int> encoded) {
 
 void EntropyDecode(ChunkedImage& chunkedImage, std::vector<int> encoded) {
 	
-	if (chunkedImage.getTransformSpace() == TransformSpace::DCT) {
+	if (chunkedImage.getTransformSpace() == TransformSpace::DCT || chunkedImage.getTransformSpace() == TransformSpace::DFT) {
 		EntropyEncoded encodedDCT;
 		VecToEntropyEncode(encoded, encodedDCT, chunkedImage.getTotalChunks(), chunkedImage.getChunkSize());
 		EntropyDecodeDCT(chunkedImage, encodedDCT);
