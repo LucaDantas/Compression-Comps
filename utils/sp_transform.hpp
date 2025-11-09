@@ -307,12 +307,12 @@ public:
   // Quantization parameterization
   struct QuantParams {
     int q_LL = 1;   // base LL step
-    int q_HL = 4;   // base HL step
-    int q_LH = 4;   // base LH step
-    int q_HH = 6;   // base HH step
-    int deadzone = 1; // dead-zone multiplier
+    int q_HL = 2;   // base HL step
+    int q_LH = 2;   // base LH step
+    int q_HH = 4;   // base HH step
+    int deadzone = 0; // dead-zone multiplier
     float scale = 1.0f; // global scale
-    float level_gamma = 1.0f; // geometric per-level multiplier
+    float level_gamma = 0.8f; // geometric per-level multiplier
     QuantParams() = default;
   };
 
