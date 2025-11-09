@@ -2,6 +2,7 @@
 #include <string>
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
 #include "utils/image_lib.hpp"
 #include "utils/dct_transform.hpp"
 #include "utils/sp_transform.hpp"
@@ -15,9 +16,13 @@
 
 int main(int argc, char* argv[]) {
     // Check command line arguments (minimum required: transform chunk_size image_path)
-    if (argc < 4) {
-        std::cerr << "Usage: " << argv[0] << " <transform_name> <image_path> <scale>" << std::endl;
-        std::cerr << "Example: " << argv[0] << " DCT 8 Datasets/SquaredKodak/1.png" << std::endl;
+    if (argc < 3) {
+        std::cerr << "Usage: " << argv[0]
+                  << " <transform_name> <chunk_size> <image_path> [quant_scale]" << std::endl;
+        std::cerr << "Example: " << argv[0]
+                  << " SP 512 Datasets/SquaredKodak/1.png 1.0" << std::endl;
+        std::cerr << "Legacy form still supported: " << argv[0]
+                  << " DCT Datasets/SquaredKodak/1.png 0.5" << std::endl;
         std::cerr << "\nAvailable transforms: DCT, SP, HAAR, DFT" << std::endl;
         return 1;
     }
@@ -25,18 +30,53 @@ int main(int argc, char* argv[]) {
     // Get transform name and convert to uppercase
     std::string transformName = argv[1];
     std::transform(transformName.begin(), transformName.end(), transformName.begin(), ::toupper);
-    
-    // Get chunk size
-    double scale = std::strtod(argv[3], nullptr);
-    int chunkSize;
-    std::string imagePath = argv[2];
+
+    auto looksInteger = [](const char* s) -> bool {
+        if (!s || *s == '\0') return false;
+        char* end = nullptr;
+        std::strtol(s, &end, 10);
+        return end && *end == '\0';
+    };
+
+    int chunkSize = 0;
+    std::string imagePath;
+    double quantScale = 1.0;
+
+    if (argc >= 4 && looksInteger(argv[2])) {
+        chunkSize = std::stoi(argv[2]);
+        imagePath = argv[3];
+        if (argc >= 5) {
+            quantScale = std::strtod(argv[4], nullptr);
+        }
+    } else {
+        // Legacy ordering: transform image_path [quant_scale]
+        imagePath = argv[2];
+        if (argc >= 4) {
+            quantScale = std::strtod(argv[3], nullptr);
+        }
+    }
+
+    if (chunkSize <= 0) {
+        chunkSize = -1; // compute later based on transform/image
+    }
     
     // Read and process image
     Image originalImg(imagePath);
     Image img(originalImg);
     double originalEntropy = originalImg.getEntropy();
 
-    if (transformName == "DFT" || transformName == "DCT") chunkSize = 8; else chunkSize = originalImg.getRows();
+    if (chunkSize <= 0) {
+        chunkSize = originalImg.getRows();
+    }
+
+    if (transformName == "DFT" || transformName == "DCT") {
+        chunkSize = 8;
+    }
+
+    if (chunkSize <= 0) {
+        std::cerr << "Invalid chunk size computed." << std::endl;
+        return 1;
+    }
     
     img.convertToYCbCr();
     ChunkedImage chunkedImg(img, chunkSize);
@@ -66,9 +106,17 @@ int main(int argc, char* argv[]) {
     ChunkedImage quantizedImg = transformedImg;
     double quantizedEntropy = transformedEntropy;
     double quant_ms = 0.0;
+    bool applyQuantization = (transformName == "DCT" || transformName == "SP" || transformName == "DFT");
+    if (transformName == "SP") {
+        if (auto* sp = dynamic_cast<SPTransform*>(transform)) {
+            auto qp = sp->getQuantParams();
+            qp.scale = static_cast<float>(quantScale);
+            sp->setQuantParams(qp);
+        }
+    }
     if (applyQuantization) {
         cscomps::util::ScopedTimer tq(quant_ms);
-        quantizedImg = transform->applyQuantization(transformedImg);
+        quantizedImg = transform->applyQuantization(transformedImg, quantScale);
         // ScopedTimer writes quant_ms on destruction
         quantizedEntropy = Image(quantizedImg).getEntropy();
     }
@@ -91,7 +139,7 @@ int main(int argc, char* argv[]) {
     double dequant_ms = 0.0;
     if (applyQuantization) {
         cscomps::util::ScopedTimer tdq(dequant_ms);
-        dequantizedImg = transform->applyInverseQuantization(quantizedImg);
+        dequantizedImg = transform->applyInverseQuantization(quantizedImg, quantScale);
     }
     
     double inverse_ms = 0.0;
@@ -103,11 +151,13 @@ int main(int argc, char* argv[]) {
     Image resultImg(decodedImg);
     resultImg.convertToRGB();
     
-    // std::string outputPath = "savedImages/output_" + transformName + ".png";
+    std::string outputPath = "savedImages/output_" + transformName + ".png";
     // resultImg.saveAsPNG(outputPath);
     
     double mse = metrics::MSE(originalImg, resultImg);
     double psnr = metrics::PSNR(originalImg, resultImg);
+    double mseChannels[3] = {0.0, 0.0, 0.0};
+    metrics::MSEChannels(originalImg, resultImg, mseChannels);
     
     std::cout << "Transform: " << transformName << ", Chunk Size: " << chunkSize << std::endl;
     std::cout << "MSE: " << mse << ", PSNR: " << psnr << " dB" << std::endl;

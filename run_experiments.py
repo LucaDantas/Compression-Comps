@@ -22,7 +22,7 @@ QUANTIZATION_SCALES = {
 }
 TRANSFORMS = ["SP", "HAAR", "DCT", "DFT"]
 DATASETS_DIR = "Datasets"
-EXECUTABLE = "./pipeline_data_collection"
+EXECUTABLE = "pipeline_data_collection.exe"
 RESULTS_DIR = "results"
 
 def find_all_images() -> List[Tuple[str, str]]:

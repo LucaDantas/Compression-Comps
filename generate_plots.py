@@ -106,6 +106,85 @@ def generate_scatter_plot(df, transform_name="All"):
     print(f"Saved {output_filename}")
     plt.close() # Close figure to free memory
 
+def generate_time_barplots(df, transform_name="All"):
+    """Generates bar plots comparing average encode/decode times."""
+
+    required_cols = {"encode_ms", "decode_ms"}
+    if not required_cols.issubset(df.columns):
+        print("Skipping time bar plots (missing encode_ms/decode_ms columns).")
+        return
+
+    if transform_name != "All":
+        df = df[df['transform'] == transform_name].copy()
+        if df.empty:
+            print(f"Skipping time bar plots for {transform_name}: no data after filtering.")
+            return
+        output_suffix = f"_{transform_name}"
+    else:
+        output_suffix = "_All"
+
+    agg = (
+        df.groupby(['dataset', 'transform'], as_index=False)
+          .agg({'encode_ms': 'mean', 'decode_ms': 'mean'})
+    )
+
+    encode_filename = f'plot_time_bars_encode{output_suffix}.png'
+    decode_filename = f'plot_time_bars_decode{output_suffix}.png'
+
+    def _plot_time(metric, filename, ylabel):
+        plt.figure(figsize=GLOBAL_FIGSIZE)
+
+        plot_data = agg.dropna(subset=[metric])
+        if plot_data.empty:
+            print(f"Skipping {filename}: no finite values for {metric}.")
+            plt.close()
+            return
+
+        if transform_name == "All":
+            sns.barplot(
+                data=plot_data,
+                x='dataset',
+                order=DATASET_ORDER,
+                y=metric,
+                hue='transform',
+                hue_order=TRANSFORM_ORDER,
+                palette=TRANSFORM_COLORS,
+                errorbar=None
+            )
+            legend_title = 'Transform'
+        else:
+            sns.barplot(
+                data=plot_data,
+                x='dataset',
+                order=DATASET_ORDER,
+                y=metric,
+                palette=DATASET_COLORS,
+                errorbar=None
+            )
+            legend_title = None
+
+        title = f"Average {ylabel} Time (ms)"
+        if transform_name != "All":
+            title += f" – {transform_name}"
+
+        plt.title(title, fontsize=18, fontweight='bold')
+        plt.xlabel('Dataset', fontsize=16)
+        plt.ylabel(f'{ylabel} Time (ms)', fontsize=16)
+        if legend_title:
+            plt.legend(title=legend_title, bbox_to_anchor=(1.05, 1), loc='upper left')
+        else:
+            plt.legend([], [], frameon=False)
+        plt.grid(axis='y', linestyle='--', alpha=0.6)
+        plt.tight_layout()
+
+        save_path = os.path.join(OUTPUT_DIR, filename)
+        plt.savefig(save_path, dpi=DPI)
+        print(f"Saved {filename}")
+        plt.close()
+
+    _plot_time('encode_ms', encode_filename, 'Encode')
+    _plot_time('decode_ms', decode_filename, 'Decode')
+
 def _filter_and_bin_data(df):
     """
     Helper function to filter data to CR intersection and apply quantile bins.
@@ -271,6 +350,7 @@ def generate_plots(df):
     print("Generating 'All Transforms' plots...")
     generate_parametric_plot(df, transform_name="All")
     generate_scatter_plot(df, transform_name="All")
+    generate_time_barplots(df, transform_name="All")
     
     # --- 2. Generate Binned Plots (Box and Bar) ---
     # These functions have their own filtering and binning logic
@@ -284,6 +364,7 @@ def generate_plots(df):
     for transform in unique_transforms:
         generate_parametric_plot(df, transform_name=transform)
         generate_scatter_plot(df, transform_name=transform)
+        generate_time_barplots(df, transform_name=transform)
     
     print("\nAll plots generated successfully.")
 

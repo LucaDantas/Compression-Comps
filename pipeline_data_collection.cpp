@@ -90,9 +90,12 @@ int main(int argc, char* argv[]) {
     HuffmanEncoder huffmanEncoder;
     std::vector<int> huffmanEncoded = huffmanEncoder.getEncoding(entropyEncoded);
     
-    // Write to binary temporary file
-    std::string tempFile = "/tmp/compressed_temp_" + std::to_string(getpid()) + ".bin";
-    writeVectorToFile(huffmanEncoded, tempFile);
+    // Write to binary temporary file in system temp directory
+    std::filesystem::path tempDir = std::filesystem::temp_directory_path();
+    std::filesystem::create_directories(tempDir);  // ensures folder exists
+    std::filesystem::path tempFile =
+    tempDir / ("compressed_temp_" + std::to_string(getpid()) + ".bin");
+    writeVectorToFile(huffmanEncoded, tempFile.string());
     
     // Calculate original image size in memory (RGB, 8 bits per channel)
     std::size_t originalSizeBytes = static_cast<std::size_t>(originalImg.getRows()) * 
@@ -113,7 +116,7 @@ int main(int argc, char* argv[]) {
     cscomps::util::Timer decodeTimer;
     
     // Read from binary file
-    std::vector<int> huffmanDecodedData = readVectorFromFile(tempFile);
+    std::vector<int> huffmanDecodedData = readVectorFromFile(tempFile.string());
     
     // Decode Huffman
     HuffmanDecoder huffmanDecoder;
