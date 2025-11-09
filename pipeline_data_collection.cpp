@@ -40,6 +40,7 @@ int main(int argc, char* argv[]) {
     
     // Read PNG
     Image originalImg(imagePath);
+    double originalEntropy = originalImg.getEntropy();
     Image img(originalImg);
     
     // Infer chunk size
@@ -77,6 +78,7 @@ int main(int argc, char* argv[]) {
     // Apply transform
     ChunkedImage transformedImg = chunkedImg.createFreshCopyForTransformResult(transform->getTransformSpace());
     transformedImg = transform->applyTransform(chunkedImg);
+    double transformedEntropy = Image(transformedImg).getEntropy();
     
     // Apply quantization
     ChunkedImage quantizedImg = transformedImg;
@@ -175,10 +177,12 @@ int main(int argc, char* argv[]) {
     std::filesystem::remove(tempFile);
     std::filesystem::remove(directTempFile);
     
-    // Output exactly in the specified format: (compression ratio, direct compression ratio, entropy quantized, mse, psnr, encoding time, decoding time)
+    // Output exactly in the specified format: (compression ratio, direct compression ratio, original entropy, transformed entropy, quantized entropy, mse, psnr, encoding time, decoding time)
     std::cout << "(" 
               << compressionRatio << ", "
               << directCompressionRatio << ", "
+              << originalEntropy << ", "
+              << transformedEntropy << ", "
               << quantizedEntropy << ", "
               << mse << ", "
               << psnr << ", "

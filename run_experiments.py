@@ -52,15 +52,15 @@ def find_all_images() -> List[Tuple[str, str]]:
     
     return sorted(images)
 
-def parse_output(output: str) -> Tuple[float, float, float, float, float, float, float]:
+def parse_output(output: str) -> Tuple[float, float, float, float, float, float, float, float, float]:
     """
     Parse the output from pipeline_data_collection.
-    Expected format: (compression_ratio, direct_compression_ratio, entropy_quantized, mse, psnr, encoding_time, decoding_time)
-    Returns: (compression_ratio, direct_compression_ratio, entropy_quantized, mse, psnr, encoding_time, decoding_time)
+    Expected format: (compression_ratio, direct_compression_ratio, original_entropy, transformed_entropy, quantized_entropy, mse, psnr, encoding_time, decoding_time)
+    Returns: (compression_ratio, direct_compression_ratio, original_entropy, transformed_entropy, quantized_entropy, mse, psnr, encoding_time, decoding_time)
     """
 
-    compression_ratio, direct_compression_ratio, entropy_quantized, mse, psnr, encoding_time, decoding_time = map(float, output.strip()[1:-1].split(','))
-    return (compression_ratio, direct_compression_ratio, entropy_quantized, mse, psnr, encoding_time, decoding_time)
+    compression_ratio, direct_compression_ratio, original_entropy, transformed_entropy, quantized_entropy, mse, psnr, encoding_time, decoding_time = map(float, output.strip()[1:-1].split(','))
+    return (compression_ratio, direct_compression_ratio, original_entropy, transformed_entropy, quantized_entropy, mse, psnr, encoding_time, decoding_time)
 
 def run_pipeline(transform: str, image_path: str, quant_scale: float, save_flag: str) -> Dict:
     """
@@ -83,6 +83,8 @@ def run_pipeline(transform: str, image_path: str, quant_scale: float, save_flag:
             "transform": transform,
             "mse": None,
             "psnr": None,
+            "original_entropy": None,
+            "transformed_entropy": None,
             "quantized_entropy": None,
             "quantization_scale": quant_scale,
             "decode_ms": None,
@@ -93,7 +95,7 @@ def run_pipeline(transform: str, image_path: str, quant_scale: float, save_flag:
         }
     
     output = result.stdout.strip()
-    (compression_ratio, direct_compression_ratio, entropy_quantized, mse, psnr, encoding_time, decoding_time) = parse_output(output)
+    (compression_ratio, direct_compression_ratio, original_entropy, transformed_entropy, quantized_entropy, mse, psnr, encoding_time, decoding_time) = parse_output(output)
 
     return {
         "dataset": Path(image_path).parent.name,
@@ -103,7 +105,9 @@ def run_pipeline(transform: str, image_path: str, quant_scale: float, save_flag:
         "psnr": psnr,
         "compression_ratio": compression_ratio,
         "direct_compression_ratio": direct_compression_ratio,
-        "quantized_entropy": entropy_quantized,
+        "original_entropy": original_entropy,
+        "transformed_entropy": transformed_entropy,
+        "quantized_entropy": quantized_entropy,
         "quantization_scale": quant_scale,
         "encode_ms": encoding_time,
         "decode_ms": decoding_time,
@@ -174,6 +178,8 @@ def main():
                     "psnr",
                     "compression_ratio",
                     "direct_compression_ratio",
+                    "original_entropy",
+                    "transformed_entropy",
                     "quantized_entropy",
                     "quantization_scale",
                     "encode_ms", 
