@@ -8,7 +8,7 @@ import os
 OUTPUT_DIR = 'extended_results/plots'
 INPUT_DIR = 'results'
 FILE_PATH = os.path.join(INPUT_DIR, 'extended_experiment_results.csv')
-GLOBAL_FIGSIZE = (12, 10) # Bigger figure size for better resolution and clarity
+GLOBAL_FIGSIZE = (20, 10) # Bigger figure size for better resolution and clarity
 DPI = 300 # Set a higher DPI for saving plots
 
 # --- Consistent Color/Order Definitions ---
@@ -57,15 +57,17 @@ def generate_parametric_plot(df, transform_name="All"):
     )
 
     title = f'1. Parametric Performance Curves by Quantization Scale (Transform: {transform_name})'
-    plt.title(title, fontsize=18, fontweight='bold')
-    plt.xlabel('Average Compression Ratio (CR)', fontsize=16)
-    plt.ylabel('Average PSNR (dB)', fontsize=16)
-    plt.legend(title='Experiment Group' if transform_name == "All" else 'Dataset', bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.title(title, fontsize=36, fontweight='bold', pad=20)
+    plt.xlabel('Average Compression Ratio (CR)', fontsize=30, labelpad=20)
+    plt.ylabel('Average PSNR (dB)', fontsize=30, labelpad=20)
+    plt.xticks(fontsize=24) # Increase tick label size
+    plt.yticks(fontsize=24) # Increase tick label size
+    plt.legend(title='Experiment Group' if transform_name == "All" else 'Dataset', bbox_to_anchor=(1.05, 1), loc='upper right', fontsize=24, markerscale=2.0, title_fontsize=24)
     plt.grid(True, linestyle='--', alpha=0.6)
-    plt.tight_layout()
+    # plt.tight_layout()
     
     save_path = os.path.join(OUTPUT_DIR, output_filename)
-    plt.savefig(save_path, dpi=DPI)
+    plt.savefig(save_path, dpi=DPI, bbox_inches='tight')
     print(f"Saved {output_filename}")
     plt.close() # Close figure to free memory
 
@@ -94,15 +96,17 @@ def generate_scatter_plot(df, transform_name="All"):
     )
 
     title = f'2. Individual Experiment Results (CR vs. PSNR) (Transform: {transform_name})'
-    plt.title(title, fontsize=18, fontweight='bold')
-    plt.xlabel('Compression Ratio (CR)', fontsize=16)
-    plt.ylabel('PSNR (dB)', fontsize=16)
-    plt.legend(title='Experiment Parameters' if transform_name == "All" else 'Dataset', bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.title(title, fontsize=36, fontweight='bold', pad=20)
+    plt.xlabel('Compression Ratio (CR)', fontsize=30, labelpad=20)
+    plt.ylabel('PSNR (dB)', fontsize=30, labelpad=20)
+    plt.xticks(fontsize=24) # Increase tick label size
+    plt.yticks(fontsize=24) # Increase tick label size
+    plt.legend(title='Experiment Parameters' if transform_name == "All" else 'Dataset', bbox_to_anchor=(1.05, 1), loc='upper right', fontsize=24, markerscale=2.0, title_fontsize=24)
     plt.grid(True, linestyle='--', alpha=0.6)
-    plt.tight_layout()
+    # plt.tight_layout()
 
     save_path = os.path.join(OUTPUT_DIR, output_filename)
-    plt.savefig(save_path, dpi=DPI)
+    plt.savefig(save_path, dpi=DPI, bbox_inches='tight')
     print(f"Saved {output_filename}")
     plt.close() # Close figure to free memory
 
@@ -181,16 +185,18 @@ def generate_binned_boxplots(df):
         )
 
         title = f'3. PSNR Distribution by Transform and Dataset (Quantile Bin)\n(Filtered Intersection CR Range: {bin_str})'
-        plt.title(title, fontsize=18, fontweight='bold')
-        plt.xlabel('Dataset', fontsize=16)
-        plt.ylabel('PSNR (dB) Distribution', fontsize=16)
+        plt.title(title, fontsize=36, fontweight='bold', pad=20)
+        plt.xlabel('Dataset', fontsize=30, labelpad=20)
+        plt.ylabel('PSNR (dB) Distribution', fontsize=30, labelpad=20)
+        plt.xticks(fontsize=24) # Increase tick label size
+        plt.yticks(fontsize=24) # Increase tick label size
 
-        plt.legend(title='Transform', bbox_to_anchor=(1.05, 1), loc='upper left')
+        plt.legend(title='Transform', bbox_to_anchor=(1.05, 1), loc='upper right', fontsize=24, markerscale=2.0, title_fontsize=24)
         plt.grid(axis='y', linestyle='--', alpha=0.7)
-        plt.tight_layout()
+        # plt.tight_layout()
         
         save_path = os.path.join(OUTPUT_DIR, output_filename)
-        plt.savefig(save_path, dpi=DPI)
+        plt.savefig(save_path, dpi=DPI, bbox_inches='tight')
         print(f"Saved {output_filename}")
         plt.close()
 
@@ -236,9 +242,11 @@ def generate_binned_bar_plots(df):
         )
 
         title = f'4. Mean PSNR by Transform and Dataset (Quantile Bin)\n(Filtered Intersection CR Range: {bin_str})'
-        plt.title(title, fontsize=18, fontweight='bold')
-        plt.xlabel('Dataset', fontsize=16)
-        plt.ylabel('Mean PSNR (dB)', fontsize=16)
+        plt.title(title, fontsize=36, fontweight='bold', pad=20)
+        plt.xlabel('Dataset', fontsize=30, labelpad=20)
+        plt.ylabel('Mean PSNR (dB)', fontsize=30, labelpad=20)
+        plt.xticks(fontsize=24) # Increase tick label size
+        plt.yticks(fontsize=24) # Increase tick label size
         
         # Optional: Add mean value labels on top of bars
         # This can get cluttered, uncomment if needed
@@ -251,12 +259,12 @@ def generate_binned_bar_plots(df):
         #                   textcoords='offset points',
         #                   fontsize=9)
 
-        plt.legend(title='Transform', bbox_to_anchor=(1.05, 1), loc='upper left')
+        plt.legend(title='Transform', bbox_to_anchor=(1.05, 1), loc='upper right', fontsize=24, markerscale=2.0, title_fontsize=24)
         plt.grid(axis='y', linestyle='--', alpha=0.7)
-        plt.tight_layout()
+        # plt.tight_layout()
         
         save_path = os.path.join(OUTPUT_DIR, output_filename)
-        plt.savefig(save_path, dpi=DPI)
+        plt.savefig(save_path, dpi=DPI, bbox_inches='tight')
         print(f"Saved {output_filename}")
         plt.close()
 
