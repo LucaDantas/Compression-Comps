@@ -5,7 +5,7 @@ import seaborn as sns
 import os
 
 # --- Configuration ---
-OUTPUT_DIR = 'extended_results/plots'
+OUTPUT_DIR = 'extended_results/Plots11.9'
 INPUT_DIR = 'results'
 FILE_PATH = os.path.join(INPUT_DIR, 'extended_experiment_results.csv')
 GLOBAL_FIGSIZE = (12, 10) # Bigger figure size for better resolution and clarity
