@@ -306,13 +306,13 @@ private:
 public:
   // Quantization parameterization
   struct QuantParams {
-    int q_LL = 1;   // base LL step
+    int q_LL = 0;   // base LL step
     int q_HL = 2;   // base HL step
     int q_LH = 2;   // base LH step
     int q_HH = 4;   // base HH step
-    int deadzone = 0; // dead-zone multiplier
+    float deadzone = 4.0f; // dead-zone multiplier
     float scale = 1.0f; // global scale
-    float level_gamma = 0.8f; // geometric per-level multiplier
+    float level_gamma = 0.25f; // geometric per-level multiplier
     QuantParams() = default;
   };
 
@@ -345,6 +345,7 @@ public:
     QTable qt;
     float level_factor = 1.0f;
     // Only use geometric scaling when level_gamma > 0.0
+    // std::cout << "Scale: " << qparams.scale << std::endl;
     if (qparams.level_gamma > 0.0f) {
       level_factor = std::pow(qparams.level_gamma, static_cast<float>(level));
     } else {
@@ -545,6 +546,9 @@ public:
       const int S = chunkSize;
       const int L = levelsFor(W, H);
 
+      const float originalScale = qparams.scale;
+      qparams.scale = static_cast<float>(scale);
+
       std::vector<QTable> qtables;
       qtables.reserve(L);
       for (int lev = 0; lev < L; ++lev) {
@@ -573,8 +577,11 @@ public:
         // write back (store ints)
         for (int y = 0; y < chunkSize; ++y)
           for (int x = 0; x < chunkSize; ++x)
-            outputChunk[ch][y][x] = plane[y * chunkSize + x] / scale;
+            outputChunk[ch][y][x] = plane[y * chunkSize + x];
+            // why did I have scale here? Should be just the quantized value
       }
+
+  qparams.scale = originalScale;
     }
 
     // Dequantize a single chunk (override of Transform::dequantizeChunk)
@@ -584,6 +591,8 @@ public:
       const int H = chunkSize;
       const int S = chunkSize;
       const int L = levelsFor(W, H);
+      const float originalScale = qparams.scale;
+      qparams.scale = static_cast<float>(scale);
 
       std::vector<QTable> qtables;
       qtables.reserve(L);
@@ -614,8 +623,10 @@ public:
 
         for (int y = 0; y < chunkSize; ++y)
           for (int x = 0; x < chunkSize; ++x)
-            outputChunk[ch][y][x] = plane[y * chunkSize + x] * scale;
+            outputChunk[ch][y][x] = plane[y * chunkSize + x];
       }
+
+      qparams.scale = originalScale;
     }
 
     // Estimate bits-per-pixel from a quantized ChunkedImage using symbol entropy (bits/sample * channels)

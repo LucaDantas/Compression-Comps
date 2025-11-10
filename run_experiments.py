@@ -11,23 +11,24 @@ from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import List, Tuple, Dict
 import re
+import random
 # from wakepy import keep
 
 # Configuration
 QUANTIZATION_SCALES = {
-    "SP": [i for i in range(1, 21)],
-    "HAAR": [i for i in range(1, 251, 5)],
-    "DCT": [i for i in range(1, 21)] + [i / 10 for i in range(5, 10)],
-    "DFT": [i for i in range(1, 201, 5)]
+    "SP": [0.5 * (1.3**i) for i in range(20)],
+    "HAAR": [1.3**(i-1) for i in range(20)],
+    "DCT": [0.1 * 1.2**(i) for i in range(20)],
+    "DFT": [1.3**(i-1) for i in range(20)]
 }
-TRANSFORMS = ["SP", "HAAR", "DCT", "DFT"]
+TRANSFORMS = ["HAAR", "SP", "DCT", "DFT"]
 DATASETS_DIR = "Datasets"
 EXECUTABLE = "./pipeline_data_collection"
 RESULTS_DIR = "results"
 
 def find_all_images() -> List[Tuple[str, str]]:
     """
-    Find all PNG images in all dataset subdirectories.
+    Find PNG images in all dataset subdirectories, sampling 25 images per dataset.
     Returns list of (dataset_name, image_path) tuples.
     """
     images = []
@@ -40,15 +41,23 @@ def find_all_images() -> List[Tuple[str, str]]:
     for dataset_dir in datasets_path.iterdir():
         if dataset_dir.is_dir():
             dataset_name = dataset_dir.name
+            dataset_images = []
+            
             for image_file in dataset_dir.glob("*.png"):
                 image_path = str(image_file)
-                print(dataset_name, image_path)
                 match = re.search(r"[\d]+.png", image_path)
                 if match:
                     num = int(match.group()[:-4])
-                if dataset_name == "SquaredIconsSample" and num > 50:
-                    continue
-                images.append((dataset_name, image_path))
+                dataset_images.append((dataset_name, image_path))
+            
+            # Sample 25 images from this dataset (or all if less than 25)
+            if len(dataset_images) > 25:
+                sampled = random.sample(dataset_images, 25)
+                images.extend(sorted(sampled))
+                print(f"Sampled 25 images from {dataset_name} (out of {len(dataset_images)} total)")
+            else:
+                images.extend(sorted(dataset_images))
+                print(f"Using all {len(dataset_images)} images from {dataset_name}")
     
     return sorted(images)
 
@@ -138,7 +147,7 @@ def main():
             for quant_scale in QUANTIZATION_SCALES[transform]:
                 tasks.append((transform, dataset_name, image_path, quant_scale, "no_save"))
     
-    print(f"Total tasks: {len(tasks)} (4 transforms × {len(images)} images)")
+    print(f"Total tasks: {len(tasks)} ({len(TRANSFORMS)} transforms × {len(images)} images)")
     
     # Run tasks in parallel
     results = []
