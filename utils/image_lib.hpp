@@ -633,7 +633,7 @@ protected:
 		int size = inputChunk.getChunkSize();
 		int result;
 		int inputValue;
-		int matrixValue;
+		double matrixValue;
 
         auto quantizationMatrix = getQuantizationMatrix(size);
 		
@@ -653,7 +653,7 @@ protected:
 		int size = encodedChunk.getChunkSize();
 		int result;
 		int encodedValue;
-		int matrixValue;
+		double matrixValue;
 
         auto quantizationMatrix = getQuantizationMatrix(size);
 		
