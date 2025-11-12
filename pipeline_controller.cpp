@@ -6,9 +6,9 @@
 #include <filesystem>
 #include <sys/stat.h>
 #include "utils/image_lib.hpp"
-#include "utils/dct_transform.hpp"
-#include "utils/sp_transform.hpp"
-#include "DWT/haar_transform.hpp"  // Uncomment when Haar transform is fixed
+#include "transforms/dct_transform.hpp"
+#include "transforms/sp_transform.hpp"
+#include "transforms/haar_transform.hpp"  // Uncomment when Haar transform is fixed
 
 // Forward declarations
 struct ProgramArgs {

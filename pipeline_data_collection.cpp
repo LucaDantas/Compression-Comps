@@ -8,10 +8,10 @@
 #include <fstream>
 #include <vector>
 #include "utils/image_lib.hpp"
-#include "utils/dct_transform.hpp"
-#include "utils/sp_transform.hpp"
-#include "utils/dft_transform.hpp"
-#include "DWT/haar_transform.hpp"
+#include "transforms/dct_transform.hpp"
+#include "transforms/sp_transform.hpp"
+#include "transforms/dft_transform.hpp"
+#include "transforms/haar_transform.hpp"
 #include "utils/entropy.hpp"
 #include "utils/dpcm.hpp"
 #include "utils/rle.hpp"
