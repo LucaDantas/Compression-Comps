@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 #include "utils/image_lib.hpp"
 #include "transforms/dct_transform.hpp"
+#include "transforms/dft_transform.hpp"
 #include "transforms/sp_transform.hpp"
 #include "transforms/haar_transform.hpp"  // Uncomment when Haar transform is fixed
 
@@ -148,11 +149,11 @@ ProgramArgs parseCommandLineArgs(int argc, char* argv[]) {
             std::string transformArg = argv[i + 1];
             // Convert to uppercase for case-insensitive comparison
             std::transform(transformArg.begin(), transformArg.end(), transformArg.begin(), ::toupper);
-            if (transformArg == "DCT" || transformArg == "SP" || transformArg == "HAAR") {
+            if (transformArg == "DCT" || transformArg == "SP" || transformArg == "HAAR" || transformArg == "DFT") {
                 args.transformType = transformArg;
                 i++; // Skip the next argument since we consumed it
             } else {
-                std::cerr << "Error: Invalid transform type '" << argv[i + 1] << "'. Must be DCT, SP, or HAAR." << std::endl;
+                std::cerr << "Error: Invalid transform type '" << argv[i + 1] << "'. Must be DCT, DFT, SP, or HAAR." << std::endl;
                 args.chunkSize = -1; // Set error state
                 return args;
             }
@@ -165,7 +166,7 @@ ProgramArgs parseCommandLineArgs(int argc, char* argv[]) {
             args.chunkSize = -1; // Set error state
             return args;
         } else if (arg == "--transform") {
-            std::cerr << "Error: --transform requires a value (DCT, SP, or HAAR)" << std::endl;
+            std::cerr << "Error: --transform requires a value (DCT, DFT, SP, or HAAR)" << std::endl;
             args.chunkSize = -1; // Set error state
             return args;
         } else {
@@ -198,7 +199,7 @@ ProgramArgs parseCommandLineArgs(int argc, char* argv[]) {
 }
 
 void printUsage(const char* programName) {
-    std::cerr << "Usage: " << programName << " --chunksize <size> --path <image_path> [--transform DCT|SP|HAAR]" << std::endl;
+    std::cerr << "Usage: " << programName << " --chunksize <size> --path <image_path> [--transform DCT|DFT|SP|HAAR]" << std::endl;
     std::cerr << "Example: " << programName << " --chunksize 8 --path Datasets/KodakImages/1.png" << std::endl;
     std::cerr << "Example: " << programName << " --chunksize 8 --path Datasets/KodakImages/1.png --transform SP" << std::endl;
     std::cerr << "Example: " << programName << " --chunksize 8 --path Datasets/KodakImages/1.png --transform HAAR" << std::endl;
@@ -206,7 +207,7 @@ void printUsage(const char* programName) {
     std::cerr << "  --chunksize <size>     : Size of chunks (must be positive)" << std::endl;
     std::cerr << "  --path <image_path>    : Path to input image" << std::endl;
     std::cerr << "Optional arguments:" << std::endl;
-    std::cerr << "  --transform <type>     : Transform type (DCT, SP, HAAR). Default: DCT" << std::endl;
+    std::cerr << "  --transform <type>     : Transform type (DCT, DFT, SP, HAAR). Default: DCT" << std::endl;
 }
 
 double loadAndDisplayImageInfo(const std::string& imagePath, int chunkSize) {
@@ -256,6 +257,8 @@ Transform* createTransform(const std::string& transformType) {
     
     if (transformType == "DCT") {
         transform = new DCTTransform();
+    } else if (transformType == "DFT") {
+        transform = new DFTTransform();
     } else if (transformType == "SP") {
         transform = new SPTransform();
     } else if (transformType == "HAAR") {

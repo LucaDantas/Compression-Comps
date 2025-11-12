@@ -52,7 +52,7 @@ int main(int argc, char* argv[]) {
     }
     
     // Make chunked image
-    if (transformName != "DFT") img.convertToYCbCr(); else img.convertToGrayscale();
+    img.convertToYCbCr();
     ChunkedImage chunkedImg(img, chunkSize);
     
     // Create transform
@@ -65,8 +65,6 @@ int main(int argc, char* argv[]) {
         transform = new HaarTransform();
     } else if (transformName == "DFT") {
         transform = new DFTTransform();
-        originalImg.convertToGrayscale();
-        originalImg.convertToRGBFromGrayscale();
     } else {
         std::cerr << "Error: Unknown transform " << transformName << std::endl;
         return 1;
@@ -157,11 +155,7 @@ int main(int argc, char* argv[]) {
     
     // Convert back to Image
     Image resultImg(decodedImg);
-    if (transformName == "DFT") {
-        resultImg.convertToRGBFromGrayscale();
-    } else {
-        resultImg.convertToRGB();
-    }
+    resultImg.convertToRGB();
     
     // Calculate metrics
     double mse = metrics::MSE(originalImg, resultImg);
