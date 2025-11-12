@@ -11,7 +11,7 @@
 #include <vector>
 #include <cmath>
 #include <algorithm>
-#include "image_lib.hpp" 
+#include "../utils/transform.hpp" 
 
 namespace cscomps {
 namespace sp {

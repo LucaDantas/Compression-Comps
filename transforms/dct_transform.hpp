@@ -5,7 +5,7 @@
 #include <complex>
 #include <vector>
 #include <iostream>
-#include "image_lib.hpp"
+#include "../utils/transform.hpp"
 
 // Implementation of DCT Transform using the FFT algorithm.
 class DCTTransform : public Transform {

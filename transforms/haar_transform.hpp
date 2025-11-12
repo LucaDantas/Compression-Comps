@@ -2,7 +2,7 @@
 #define HAAR_TRANSFORM_HPP
 
 #include <cmath>
-#include "../utils/image_lib.hpp"
+#include "../utils/transform.hpp"
 
 // Example implementation: DCT Transform
 class HaarTransform : public Transform {

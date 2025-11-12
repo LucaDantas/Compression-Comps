@@ -3,9 +3,7 @@ savedImages/
 
 # Compiled executables
 pipeline_controller
-sp_pipeline_controller
-simple_pipeline
-simple_pipeline_verbose
+pipeline_data_collection
 
 # Other generated files
 decodedImage.png
