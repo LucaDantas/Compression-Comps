@@ -15,7 +15,7 @@
 #include "utils/entropy.hpp"
 #include "utils/dpcm.hpp"
 #include "utils/rle.hpp"
-#include "utils/metrics.cpp"
+#include "utils/metrics.hpp"
 #include "utils/timer.hpp"
 #include "utils/huffman.hpp"
 #include "utils/binary_io.hpp"
