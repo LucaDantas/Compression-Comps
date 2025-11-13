@@ -5,7 +5,7 @@
 #include <complex>
 #include <vector>
 #include <iostream>
-#include "../utils/transform.hpp"
+#include "image_lib.hpp"
 
 // Implementation of DFT Transform using the FFT algorithm.
 class DFTTransform : public Transform {
@@ -80,34 +80,63 @@ public:
         FFT(data, 1);
     }
 
+    int zip(int r, int c) {
+        int res = 0;
+        if (r < 0) {
+            res = 1 << 21;
+            r = -r;
+        }
+        res |= (r << 11);
+        if (c < 0) {
+            res |= 1 << 10;
+            c = -c;
+        }
+        res |= c;
+
+        return res;
+    }
+
+    std::pair<int, int> unzip(int code) {
+        int r = code >> 11;
+        if (r >> 10 == 1) {
+            r = -(r & 0x3FF);
+        }
+        int c = code & 0x7FF;
+        if (c >> 10 == 1) {
+            c = -(c & 0x3FF);
+        }
+        return {r, c};
+    }
+
     // Implement encodeChunk for DFT: O(N^2logN) implementation
     void encodeChunk(const Chunk& inputChunk, Chunk& outputChunk) {
         int n = inputChunk.getChunkSize();
 
-        std::vector<std::vector<std::complex<double>>> result(n, std::vector<std::complex<double>>(n));
-        for (int i = 0; i < n; i++) {
-            for (int j = 0; j < n; j++) {
-                result[i][j] = (double)inputChunk[0][i][j] - 128;
+        for (int ch = 0; ch < 3; ch++) {
+            std::vector<std::vector<std::complex<double>>> result(n, std::vector<std::complex<double>>(n));
+            for (int i = 0; i < n; i++) {
+                for (int j = 0; j < n; j++) {
+                    result[i][j] = (double)inputChunk[ch][i][j] - 128;
+                }
             }
-        }
 
-        for (int row = 0; row < n; row++)
-            ForwardFFT(result[row]);
+            for (int row = 0; row < n; row++)
+                ForwardFFT(result[row]);
 
 
-        for (int col = 0; col < n; col++) {
-            std::vector<std::complex<double>> temp_col(n);
-            for (int i = 0; i < n; i++)
-                temp_col[i] = result[i][col];
-            ForwardFFT(temp_col);
-            for (int i = 0; i < n; i++)
-                result[i][col] = temp_col[i];
-        }
+            for (int col = 0; col < n; col++) {
+                std::vector<std::complex<double>> temp_col(n);
+                for (int i = 0; i < n; i++)
+                    temp_col[i] = result[i][col];
+                ForwardFFT(temp_col);
+                for (int i = 0; i < n; i++)
+                    result[i][col] = temp_col[i];
+            }
 
-        for(int i = 0; i < n; i++) {
-            for(int j = 0; j < n; j++) {
-                outputChunk[0][i][j] = std::round(result[i][j].real());
-                outputChunk[1][i][j] = std::round(result[i][j].imag());
+            for(int i = 0; i < n; i++) {
+                for(int j = 0; j < n; j++) {
+                    outputChunk[ch][i][j] = zip((int)std::round(result[i][j].real()), (int)std::round(result[i][j].imag()));
+                }
             }
         }
     }
@@ -116,33 +145,79 @@ public:
     void decodeChunk(const Chunk& encodedChunk, Chunk& outputChunk) {
         int n = encodedChunk.getChunkSize();
 
-        // Simple example: copy all channel data
-        std::vector<std::vector<std::complex<double>>> result(n, std::vector<std::complex<double>>(n));
-        for (int i = 0; i < n; i++) {
-            for (int j = 0; j < n; j++) {
-                result[i][j] = std::complex<double>(encodedChunk[0][i][j], encodedChunk[1][i][j]);
+        for (int ch = 0; ch < 3; ch++) {
+            std::vector<std::vector<std::complex<double>>> result(n, std::vector<std::complex<double>>(n));
+            for (int i = 0; i < n; i++) {
+                for (int j = 0; j < n; j++) {
+                    std::pair<int, int> vals = unzip(encodedChunk[ch][i][j]);
+                    result[i][j] = std::complex<double>(vals.first, vals.second);
+                }
             }
-        }
 
-        for (int row = 0; row < n; row++)
-            InverseFFT(result[row]);
+            for (int row = 0; row < n; row++)
+                InverseFFT(result[row]);
 
 
-        for (int col = 0; col < n; col++) {
-            std::vector<std::complex<double>> temp_col(n);
-            for (int i = 0; i < n; i++)
-                temp_col[i] = result[i][col];
-            InverseFFT(temp_col);
-            for (int i = 0; i < n; i++)
-                result[i][col] = temp_col[i];
-        }
+            for (int col = 0; col < n; col++) {
+                std::vector<std::complex<double>> temp_col(n);
+                for (int i = 0; i < n; i++)
+                    temp_col[i] = result[i][col];
+                InverseFFT(temp_col);
+                for (int i = 0; i < n; i++)
+                    result[i][col] = temp_col[i];
+            }
 
-        for(int i = 0; i < n; i++) {
-            for(int j = 0; j < n; j++) {
-                outputChunk[0][i][j] = std::round(result[i][j].real()) + 128;
+            for(int i = 0; i < n; i++) {
+                for(int j = 0; j < n; j++) {
+                    outputChunk[ch][i][j] = std::round(result[i][j].real()) + 128;
+                }
             }
         }
     }
+
+    void quantizeChunk(const Chunk& inputChunk, Chunk& outputChunk, double scale) {
+		
+		int size = inputChunk.getChunkSize();
+		int result;
+		int realValue;
+        int complexValue;
+		int matrixValue;
+		std::pair<int, int> vals;
+
+		for (int ch = 0; ch < 3; ch++) {
+			for (int u = 0; u < size; u++) {
+				for (int v = 0; v < size; v++) {
+                    vals = unzip(inputChunk[ch][u][v]);
+					realValue = std::round(vals.first / scale);
+                    complexValue = std::round(vals.second / scale);
+					result = zip(realValue, complexValue);
+					outputChunk[ch][u][v] = result;
+				}
+			}
+		}
+	}
+
+	void dequantizeChunk(const Chunk& encodedChunk, Chunk& outputChunk, double scale) {
+		
+		int size = encodedChunk.getChunkSize();
+		int result;
+		int realValue;
+        int complexValue;
+		int matrixValue;
+		std::pair<int, int> vals;
+
+		for (int ch = 0; ch < 3; ch++) {
+			for (int u = 0; u < size; u++) {
+				for (int v = 0; v < size; v++) {
+                    vals = unzip(encodedChunk[ch][u][v]);
+					realValue = vals.first * scale;
+                    complexValue = vals.second * scale;
+					result = zip(realValue, complexValue);
+					outputChunk[ch][u][v] = result;
+				}
+			}
+		}
+	}
 };
 
 #endif // DFT_TRANSFORM_HPP
