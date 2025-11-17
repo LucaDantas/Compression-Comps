@@ -512,8 +512,8 @@ void createEncodedVisualization(const Image& encodedImg, const std::string& save
     for (int ch = 0; ch < 3; ch++) {
         std::sort(channelValues[ch].begin(), channelValues[ch].end());
         int n = channelValues[ch].size();
-        percentile10[ch] = channelValues[ch][static_cast<int>(n * 0.10)];
-        percentile90[ch] = channelValues[ch][static_cast<int>(n * 0.90)];
+        percentile10[ch] = channelValues[ch][static_cast<int>(n * 0.01)];
+        percentile90[ch] = channelValues[ch][static_cast<int>(n * 0.99)];
     }
     
     // Create visualization image by copying the encoded image

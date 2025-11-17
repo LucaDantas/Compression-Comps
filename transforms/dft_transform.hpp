@@ -5,7 +5,7 @@
 #include <complex>
 #include <vector>
 #include <iostream>
-#include "image_lib.hpp"
+#include "../utils/image_lib.hpp"
 
 // Implementation of DFT Transform using the FFT algorithm.
 class DFTTransform : public Transform {
@@ -80,31 +80,16 @@ public:
         FFT(data, 1);
     }
 
-    int zip(int r, int c) {
-        int res = 0;
-        if (r < 0) {
-            res = 1 << 21;
-            r = -r;
-        }
-        res |= (r << 11);
-        if (c < 0) {
-            res |= 1 << 10;
-            c = -c;
-        }
+    int zip(short r, short c) {
+        int res = r;
+        res <<= 16;
         res |= c;
-
         return res;
     }
 
-    std::pair<int, int> unzip(int code) {
-        int r = code >> 11;
-        if (r >> 10 == 1) {
-            r = -(r & 0x3FF);
-        }
-        int c = code & 0x7FF;
-        if (c >> 10 == 1) {
-            c = -(c & 0x3FF);
-        }
+    std::pair<short, short> unzip(int code) {
+        short r = code >> 16;
+        short c = code & 0xFFFF;
         return {r, c};
     }
 
@@ -135,7 +120,7 @@ public:
 
             for(int i = 0; i < n; i++) {
                 for(int j = 0; j < n; j++) {
-                    outputChunk[ch][i][j] = zip((int)std::round(result[i][j].real()), (int)std::round(result[i][j].imag()));
+                    outputChunk[ch][i][j] = zip((short)std::round(result[i][j].real()), (short)std::round(result[i][j].imag()));
                 }
             }
         }
@@ -149,7 +134,7 @@ public:
             std::vector<std::vector<std::complex<double>>> result(n, std::vector<std::complex<double>>(n));
             for (int i = 0; i < n; i++) {
                 for (int j = 0; j < n; j++) {
-                    std::pair<int, int> vals = unzip(encodedChunk[ch][i][j]);
+                    std::pair<short, short> vals = unzip(encodedChunk[ch][i][j]);
                     result[i][j] = std::complex<double>(vals.first, vals.second);
                 }
             }
@@ -179,10 +164,10 @@ public:
 		
 		int size = inputChunk.getChunkSize();
 		int result;
-		int realValue;
-        int complexValue;
+		short realValue;
+        short complexValue;
 		int matrixValue;
-		std::pair<int, int> vals;
+		std::pair<short, short> vals;
 
 		for (int ch = 0; ch < 3; ch++) {
 			for (int u = 0; u < size; u++) {
@@ -201,10 +186,10 @@ public:
 		
 		int size = encodedChunk.getChunkSize();
 		int result;
-		int realValue;
-        int complexValue;
+	    short realValue;
+        short complexValue;
 		int matrixValue;
-		std::pair<int, int> vals;
+		std::pair<short, short> vals;
 
 		for (int ch = 0; ch < 3; ch++) {
 			for (int u = 0; u < size; u++) {
