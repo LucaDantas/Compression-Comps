@@ -49,15 +49,9 @@ def find_all_images() -> List[Tuple[str, str]]:
                 if match:
                     num = int(match.group()[:-4])
                 dataset_images.append((dataset_name, image_path))
-            
-            # Sample 25 images from this dataset (or all if less than 25)
-            if len(dataset_images) > 25:
-                sampled = random.sample(dataset_images, 25)
-                images.extend(sorted(sampled))
-                print(f"Sampled 25 images from {dataset_name} (out of {len(dataset_images)} total)")
-            else:
-                images.extend(sorted(dataset_images))
-                print(f"Using all {len(dataset_images)} images from {dataset_name}")
+
+            images.extend(sorted(dataset_images))
+            print(f"Using all {len(dataset_images)} images from {dataset_name}")
     
     return sorted(images)
 

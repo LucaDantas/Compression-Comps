@@ -45,11 +45,11 @@ def generate_parametric_plot(df, transform_name="All"):
         data=avg_df,
         x='compression_ratio',
         y='psnr',
-        hue='dataset',
-        hue_order=DATASET_ORDER,
-        palette=DATASET_COLORS,
-        style='transform' if transform_name == "All" else None,
-        style_order=TRANSFORM_ORDER if transform_name == "All" else None,
+        style='dataset',
+        style_order=DATASET_ORDER,
+        palette=TRANSFORM_COLORS,
+        hue='transform' if transform_name == "All" else None,
+        hue_order=TRANSFORM_ORDER if transform_name == "All" else None,
         markers=True,
         dashes=False,
         linewidth=2,
@@ -63,6 +63,48 @@ def generate_parametric_plot(df, transform_name="All"):
     plt.xticks(fontsize=24) # Increase tick label size
     plt.yticks(fontsize=24) # Increase tick label size
     plt.legend(title='Experiment Group' if transform_name == "All" else 'Dataset', bbox_to_anchor=(1.05, 1), loc='upper right', fontsize=24, markerscale=2.0, title_fontsize=24)
+    plt.grid(True, linestyle='--', alpha=0.6)
+    # plt.tight_layout()
+    
+    save_path = os.path.join(OUTPUT_DIR, output_filename)
+    plt.savefig(save_path, dpi=DPI, bbox_inches='tight')
+    print(f"Saved {output_filename}")
+    plt.close() # Close figure to free memory
+
+def generate_huffman_boxplot(df, transform_name="ALL"):
+
+    
+    # Filter data if a specific transform is requested
+    if transform_name != "All":
+        df = df[df['transform'] == transform_name].copy()
+        output_filename = f'plot_huffman_box_{transform_name}.png'
+    else:
+        output_filename = 'plot_1_huffman_box_All.png'
+
+    # Group by all categorical variables AND the quantization_scale to trace the performance curve
+    melted_df = df.melt(id_vars=['transform'], value_vars=['compression_ratio', 'direct_compression_ratio'], var_name='compression_type', value_name='compression')
+
+    plt.figure(figsize=GLOBAL_FIGSIZE)
+
+    sns.boxplot(
+        data=melted_df,
+        x='transform',
+        order=TRANSFORM_ORDER,
+        y='compression',
+        hue='compression_type',
+        dodge=True,
+        showfliers=False
+    )
+
+    title = f'Compression Ratio with and without Entropy Encoding by Transform'
+    plt.title(title, fontsize=36, fontweight='bold', pad=20)
+    plt.xlabel('Transform', fontsize=30, labelpad=20)
+    plt.ylabel('Compression Ratio', fontsize=30, labelpad=20)
+    plt.xticks(fontsize=24) # Increase tick label size
+    plt.yticks(fontsize=24) # Increase tick label size
+    legend = plt.legend(title='Entropy Encoding', labels=['With', 'Without'], bbox_to_anchor=(1.05, 1), loc='upper right', fontsize=24, markerscale=2.0, title_fontsize=24)
+    legend.legend_handles[0].set_color('tab:red')
+    legend.legend_handles[1].set_color('tab:blue')
     plt.grid(True, linestyle='--', alpha=0.6)
     # plt.tight_layout()
     
@@ -86,11 +128,11 @@ def generate_scatter_plot(df, transform_name="All"):
         data=df,
         x='compression_ratio',
         y='psnr',
-        hue='dataset',
-        hue_order=DATASET_ORDER,
-        palette=DATASET_COLORS,
-        style='transform' if transform_name == "All" else None,
-        style_order=TRANSFORM_ORDER if transform_name == "All" else None,
+        style='dataset',
+        style_order=DATASET_ORDER,
+        palette=TRANSFORM_COLORS,
+        hue='transform' if transform_name == "All" else None,
+        hue_order=TRANSFORM_ORDER if transform_name == "All" else None,
         alpha=0.5,
         s=50,
     )
@@ -279,6 +321,7 @@ def generate_plots(df):
     print("Generating 'All Transforms' plots...")
     generate_parametric_plot(df, transform_name="All")
     generate_scatter_plot(df, transform_name="All")
+    generate_huffman_boxplot(df, transform_name="All")
     
     # --- 2. Generate Binned Plots (Box and Bar) ---
     # These functions have their own filtering and binning logic
