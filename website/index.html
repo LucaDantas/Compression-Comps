@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transformers Zoo: The Role of Transforms in Image Compression</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+
+<body>
+    <nav>
+        <div class="container">
+            <div class="logo" style="font-size: 1.2rem;">Transformers Zoo</div>
+            <div class="nav-links">
+                <a href="#overview">Overview</a>
+                <a href="#visualizations">Visualizations</a>
+                <a href="#team">Team</a>
+                <a href="#resources">Resources</a>
+                <a href="posters.html">Posters</a>
+                <a href="https://github.com/LucaDantas/Compression-Comps" target="_blank" class="github-link"><i
+                        class="fab fa-github"></i> GitHub</a>
+            </div>
+        </div>
+    </nav>
+
+    <header class="hero">
+        <div class="container hero-content">
+            <h1>The Role of Transform Coding in Image Compression</h1>
+            <a href="#overview" class="btn">Learn More</a>
+        </div>
+    </header>
+
+    <section id="overview">
+        <div class="container">
+            <div class="overview-content reveal">
+                <h2>Project Overview</h2>
+                <p>
+                    As filesizes continue to increase, efficient compression algorithms become critical for transmitting
+                    and storing large amounts of information. Images are essential across the web, and as display
+                    resolutions increase, the demand for higher-quality images grows—making compression even more
+                    necessary to manage storage and bandwidth.
+                </p>
+                <p>
+                    Data compression represents data in a form that occupies less space than the raw data. There are two
+                    types: <strong>lossless compression</strong> (e.g., .zip and .tar files) preserves all information
+                    exactly, while <strong>lossy compression</strong> permanently alters the data to achieve higher
+                    compression ratios. In image compression, lossy methods aim to discard information that is least
+                    perceptible to humans, maintaining visual quality while reducing file size.
+                </p>
+                <p>
+                    One of the most widely used image compression standards is the <strong>JPEG Compression
+                        Standard</strong>, which has been in use for over 30 years. Our project explores JPEG
+                    compression by investigating the role of <strong>transform coding</strong>—a crucial component of
+                    the compression process.
+                </p>
+
+                <h3 style="margin-top: 2rem; margin-bottom: 1rem;">Our Compression Pipeline</h3>
+                <p>
+                    We implemented a JPEG-style compression pipeline to systematically test different transform coding
+                    methods. The pipeline follows these stages:
+                </p>
+
+                <ol style="text-align: left; max-width: 900px; margin: 1.5rem auto; line-height: 1.8;">
+                    <li><strong>Color Space Conversion:</strong> We convert raw RGB images into YCbCr color space, where
+                        luminance (Y) is separated from chrominance (Cb, Cr). This concentrates most visually important
+                        information into a single channel, making compression more effective.</li>
+
+                    <li><strong>Block Partitioning:</strong> Images are partitioned into blocks according to the
+                        specific transform being used (e.g., 8×8 blocks for DCT/DFT, or full-image tiles for Haar and
+                        S+P).</li>
+
+                    <li><strong>Transform Coding:</strong> This is the core of our investigation. We substitute one of
+                        four transforms—<strong>DCT (Discrete Cosine Transform)</strong>, <strong>DFT (Discrete Fourier
+                            Transform)</strong>, <strong>Haar Wavelet Transform</strong>, or <strong>S+P
+                            Transform</strong>—while keeping all other stages unchanged. Each transform converts spatial
+                        pixel values into a domain where redundancy is more explicit. DCT and DFT concentrate energy
+                        into low-frequency coefficients, while Haar and S+P build multiresolution decompositions.</li>
+
+                    <li><strong>Quantization:</strong> The transformed coefficients undergo quantization, the primary
+                        source of loss in the pipeline. Quantization reduces precision by mapping ranges of coefficient
+                        values to single representative values, discarding many small coefficients with limited
+                        perceptual impact. This stage is where transform quality directly affects compression
+                        efficiency.</li>
+
+                    <li><strong>Entropy Coding:</strong> The quantized coefficients are compressed using lossless
+                        methods including DPCM (Differential Pulse Code Modulation), run-length encoding, and Huffman
+                        coding. These operations convert long runs of similar values into compact binary
+                        representations.</li>
+                </ol>
+
+                <p>
+                    By keeping all pipeline components fixed except the transform stage, we can isolate and measure how
+                    each transform influences compression ratio, entropy, and reconstruction quality across different
+                    datasets.
+                </p>
+
+
+                <h3 style="margin-top: 2.5rem; margin-bottom: 1rem; text-align: center;">Compression Pipeline</h3>
+                <div style="text-align: center; margin: 2rem 0;">
+                    <img src="assets/images/pipeline_diagram.png" alt="Image Compression Pipeline Diagram"
+                        style="max-width: 100%; height: auto; border-radius: 10px; box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);">
+                </div>
+
+                <div style="text-align: center; margin-top: 2.5rem;">
+                    <a href="assets/paper/compression_comps_paper.pdf" target="_blank" class="btn">Read the Full Paper
+                        for More Details</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="visualizations">
+        <div class="container">
+            <h2 class="reveal">Visualizations</h2>
+            <div class="overview-content reveal" style="text-align: center;">
+                <h3>Haar Transform Visualization</h3>
+                <p>
+                    This animation provides a step-by-step visualization of the Haar Transform, illustrating how the
+                    algorithm processes image data to achieve compression.
+                </p>
+                <img src="assets/images/haar_visualization.gif" alt="Haar Transform Animation"
+                    style="max-width: 100%; border-radius: 10px; box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5); margin-top: 1rem;">
+            </div>
+
+            <div class="overview-content reveal" style="text-align: center; margin-top: 4rem;">
+                <h3>Compression Ratio Comparisons</h3>
+                <p>
+                    The following animations display different transforms (DCT, Haar, and S+P) at varying compression
+                    ratios, illustrating how each transform handles image quality degradation as compression increases.
+                </p>
+
+                <div style="margin-top: 2rem;">
+                    <h4>DCT (Discrete Cosine Transform)</h4>
+                    <img src="assets/images/quantization_dct.gif" alt="DCT Quantization Animation"
+                        style="max-width: 100%; border-radius: 10px; box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5); margin-top: 1rem;">
+                </div>
+
+                <div style="margin-top: 2rem;">
+                    <h4>Haar Transform</h4>
+                    <img src="assets/images/quantization_haar.gif" alt="Haar Quantization Animation"
+                        style="max-width: 100%; border-radius: 10px; box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5); margin-top: 1rem;">
+                </div>
+
+                <div style="margin-top: 2rem;">
+                    <h4>S+P Transform</h4>
+                    <img src="assets/images/quantization_sp.gif" alt="S+P Quantization Animation"
+                        style="max-width: 100%; border-radius: 10px; box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5); margin-top: 1rem;">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="team">
+        <div class="container">
+            <h2 class="reveal">Meet the Team</h2>
+            <div class="team-grid reveal">
+                <div class="team-member">
+                    <img src="assets/images/headshot_luca.jpg" alt="Luca Araujo" class="avatar"
+                        style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; margin: 0 auto 1.5rem;">
+                    <h3>Luca Araujo '26</h3>
+                    <a href="posters.html" class="btn-small"
+                        style="font-size: 0.9rem; margin-top: 1rem; display: inline-block; color: var(--primary-color);">View
+                        Poster</a>
+                </div>
+                <div class="team-member">
+                    <div class="avatar">JL</div>
+                    <h3>Joshua Lee '26</h3>
+                    <a href="posters.html" class="btn-small"
+                        style="font-size: 0.9rem; margin-top: 1rem; display: inline-block; color: var(--primary-color);">View
+                        Poster</a>
+                </div>
+                <div class="team-member">
+                    <img src="assets/images/headshot_indy.jpg" alt="Indy Lyness" class="avatar"
+                        style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; margin: 0 auto 1.5rem;">
+                    <h3>Indy Lyness '26</h3>
+                    <a href="posters.html" class="btn-small"
+                        style="font-size: 0.9rem; margin-top: 1rem; display: inline-block; color: var(--primary-color);">View
+                        Poster</a>
+                </div>
+                <div class="team-member">
+                    <div class="avatar">JW</div>
+                    <h3>Jiale Wan '26</h3>
+                    <a href="posters.html" class="btn-small"
+                        style="font-size: 0.9rem; margin-top: 1rem; display: inline-block; color: var(--primary-color);">View
+                        Poster</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="resources">
+        <div class="container">
+            <h2 class="reveal">Project Resources</h2>
+            <div class="resources-grid reveal">
+                <div class="resource-card">
+                    <div class="resource-icon">
+                        <i class="fas fa-file-pdf"></i>
+                    </div>
+                    <div class="resource-info">
+                        <h3>Final Paper</h3>
+                        <p>Read our comprehensive paper detailing the research, methodology, and results of our
+                            exploration into image compression techniques.</p>
+                        <a href="assets/paper/compression_comps_paper.pdf" target="_blank" class="btn-small">Download
+                            PDF</a>
+                    </div>
+                </div>
+                <div class="resource-card">
+                    <div class="resource-icon">
+                        <i class="fab fa-github"></i>
+                    </div>
+                    <div class="resource-info">
+                        <h3>Source Code</h3>
+                        <p>Explore the implementation of our compression algorithms and the testing pipeline on GitHub.
+                        </p>
+                        <a href="https://github.com/LucaDantas/Compression-Comps" target="_blank" class="btn-small">View
+                            Repository</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <div class="social-links">
+                <a href="https://github.com/LucaDantas/Compression-Comps" target="_blank"><i
+                        class="fab fa-github"></i></a>
+            </div>
+            <p>&copy; 2025 Data Compression Comps: Transformers Zoo Group<br>Computer Science Department, Carleton
+                College<br><em>November 2025</em></p>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
