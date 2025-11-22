@@ -112,6 +112,42 @@ public:
         
         return result;
     }
+
+    // Generate visualization steps for the transform
+    virtual std::vector<ChunkedImage> generateVisualizationSteps(const ChunkedImage& chunkedImage) {
+        std::vector<ChunkedImage> steps;
+        
+        // Check that the chunkedImage is in Raw transform space
+        if (chunkedImage.getTransformSpace() != TransformSpace::Raw) {
+            throw std::runtime_error(
+                "ChunkedImage transform space (" + transformSpaceToString(chunkedImage.getTransformSpace()) + 
+                ") is not Raw. Transform can only be applied to Raw data."
+            );
+        }
+        
+        // Create a fresh ChunkedImage with same parameters but in the transform's final transform space
+        ChunkedImage currentResult = chunkedImage.createFreshCopyForTransformResult(transformSpace);
+        
+        // Initialize with input data (copying Raw data into the result structure)
+        for (int i = 0; i < chunkedImage.getTotalChunks(); i++) {
+            currentResult.getChunkAt(i) = chunkedImage.getChunkAt(i);
+        }
+        
+        // Add initial state
+        steps.push_back(currentResult);
+        
+        // Apply encoding to each chunk and snapshot
+        for (int i = 0; i < currentResult.getTotalChunks(); i++) {
+            const Chunk& inputChunk = chunkedImage.getChunkAt(i);
+            Chunk& resultChunk = currentResult.getChunkAt(i);
+            encodeChunk(inputChunk, resultChunk);
+            
+            // Add snapshot after each chunk
+            steps.push_back(currentResult);
+        }
+        
+        return steps;
+    }
 	
 	ChunkedImage applyQuantization(const ChunkedImage& chunkedImage, double scale) {
         ChunkedImage result = chunkedImage.createFreshCopyForTransformResult(transformSpace);
