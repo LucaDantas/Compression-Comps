@@ -1,0 +1,39 @@
+To evaluate the behavior of each transform within our compression pipeline, we
+report several standard metrics drawn from image coding. These metrics quantify
+both reconstruction fidelity and the effectiveness of our bitstream reduction
+steps.
+
+\paragraph{Mean Squared Error (MSE).}
+Given an original image $I$ and its reconstruction $\hat{I}$, the MSE is
+\begin{equation}
+    \mathrm{MSE}
+    = \frac{1}{N} \sum_{i=1}^{N} (I_i - \hat{I}_i)^2,
+\end{equation}
+where $N$ is the number of pixels. Lower MSE indicates a reconstruction closer
+to the original.
+
+\paragraph{Peak Signal-to-Noise Ratio (PSNR).}
+PSNR provides a logarithmic measure of fidelity, defined as
+\begin{equation}
+    \mathrm{PSNR}
+    = 10 \log_{10}\!\left(\frac{255^2}{\mathrm{MSE}}\right) \ \mathrm{dB},
+\end{equation}
+assuming 8-bit images. Higher PSNR corresponds to higher reconstruction
+quality. We use PSNR as the primary distortion metric in all rate–distortion
+plots.
+
+\paragraph{Compression Ratio (CR).}
+As a reminder, we define the compression ratio as
+\[
+\mathrm{CR} = \frac{\text{uncompressed size}}{\text{compressed size}}.
+\]
+Unless otherwise noted, all CR values in the rate--distortion plots refer to the 
+final bitstream after entropy coding. For completeness, we also report the
+pre-entropy (“direct”) CR in one diagnostic figure to examine how much gain each
+transform receives from the entropy coder.
+
+We will also continue to use Shannon's definition of entropy discussed in Section \ref{sec:lit review}. It gives an accurate picture of how well each transform successfully decorrelated the input image.
+
+\medskip
+Together, these metrics provide the basis for the rate–distortion evaluations
+reported in Section \ref{sec:results}.

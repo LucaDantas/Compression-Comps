@@ -1,0 +1,91 @@
+% --- Use 'standalone' class to crop the output to the figure ---
+% We add the 'border' option to give a little padding
+\documentclass[tikz, border=5pt]{standalone}
+
+% --- Load pgfplots for plotting functions ---
+\usepackage{pgfplots}
+
+% --- Set compatibility for pgfplots ---
+\pgfplotsset{compat=1.18}
+
+\begin{document}
+
+% --- Define the dimensions for each plot ---
+\newdimen\plotwidth
+\newdimen\plotheight
+\setlength{\plotwidth}{7cm}
+\setlength{\plotheight}{4cm}
+
+\begin{tikzpicture}
+
+% --- Loop over all 8 basis functions (k=0 to k=7) ---
+\foreach \k in {0,...,7} {
+
+    % --- Calculate the row and column for the grid ---
+    \pgfmathsetmacro{\col}{mod(\k, 4)}  % Column: 0, 1, 2, 3
+    \pgfmathsetmacro{\row}{floor(\k / 4)} % Row: 0, 1
+
+    % --- Create a scope to position this plot in the grid ---
+    % \col*\plotwidth shifts it horizontally
+    % -\row*\plotheight shifts it vertically (negative so row 1 is below row 0)
+    \begin{scope}[
+        xshift=\col*\plotwidth, 
+        yshift=-\row*\plotheight
+    ]
+    
+    % --- Begin the axis environment for this plot ---
+    \begin{axis}[
+        % Set the title to show the frequency index 'k'
+        title={$k = \k$},
+        width=\plotwidth,
+        height=\plotheight,
+        % Set x-axis limits (for n=0 to n=7)
+        xmin=-1, xmax=8,
+        % Set y-axis limits (for cos/sin)
+        ymin=-1.5, ymax=1.8,
+        % Use a middle axis line
+        axis lines=middle,
+        % Remove all ticks and labels to keep it clean
+        xtick=\empty,
+        ytick=\empty,
+        % Style for the legend (place it above the plot)
+        legend style={
+            at={(0.5, 1.15)},
+            anchor=south,
+            legend columns=2,
+            font=\small
+        }
+    ]
+    
+    % --- Plot 1: Real Part ---
+    % W_N^(kn) = cos(2*pi*k*n/N) - j*sin(2*pi*k*n/N)
+    % Real part: cos(2*pi*k*n/8) = cos(360 * k * n / 8)
+    \addplot [
+        const plot, % This creates the "stepwise" plot
+        blue,       % Color for the real part
+        line width=1pt,
+        % Plot 9 samples: n=0..7 plus one extra at n=8
+        % to complete the final step for n=7
+        samples at={0,...,8} 
+    ]
+    {cos(360 * \k * x / 8)};
+    \addlegendentry{Real ($\cos$)}
+
+    % --- Plot 2: Imaginary Part ---
+    % Imaginary part: -sin(2*pi*k*n/8) = -sin(360 * k * n / 8)
+    \addplot [
+        const plot, % "stepwise"
+        red,        % Color for the imaginary part
+        line width=1pt,
+        samples at={0,...,8}
+    ]
+    {-sin(360 * \k * x / 8)};
+    \addlegendentry{Imag ($-\sin$)}
+    
+    \end{axis}
+    \end{scope}
+} % --- End of \foreach loop ---
+
+\end{tikzpicture}
+
+\end{document}

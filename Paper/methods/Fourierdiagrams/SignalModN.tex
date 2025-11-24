@@ -1,0 +1,92 @@
+\documentclass[tikz,border=10pt]{standalone}
+\usetikzlibrary{decorations.pathreplacing, calc}
+
+\begin{document}
+
+\begin{tikzpicture}[>=latex, x=0.8cm, y=1.0cm]
+
+% --- Configuration ---
+\def\N{8} 
+
+% Define signal values for indices 0 to 7
+\def\vzero{2.5}
+\def\vone{1.8}
+\def\vtwo{0.5}
+\def\vthree{-0.5}
+\def\vfour{-1.2}
+\def\vfive{-0.8}
+\def\vsix{-1.5}
+\def\vseven{-2.5}
+
+% --- Draw Axis ---
+\draw[->] (-9,0) -- (17,0) node[right] {$n$};
+% Vertical axis arrow only (label removed)
+\draw[->] (0,-3.5) -- (0,3.5);
+
+% --- Helper loop for periodic extension ---
+\foreach \k in {-1, 0, 1} {
+    % Calculate starting offset for this period
+    \pgfmathsetmacro{\offset}{\k * \N}
+    
+    % Visual separator lines between periods
+    \draw[dashed, lightgray] (\offset-0.5, -3.5) -- (\offset-0.5, 3.5);
+
+    % Loop through the samples
+    \foreach \i in {0, 1, 2, 3, 4, 5, 6, 7} {
+        % Calculate actual x-coordinate
+        \pgfmathsetmacro{\xraw}{\offset + \i}
+        \pgfmathtruncatemacro{\xlabel}{\xraw}
+        
+        % Select value based on index \i
+        \ifcase\i
+            \let\val\vzero
+        \or
+            \let\val\vone
+        \or
+            \let\val\vtwo
+        \or
+            \let\val\vthree
+        \or
+            \let\val\vfour
+        \or
+            \let\val\vfive
+        \or
+            \let\val\vsix
+        \or
+            \let\val\vseven
+        \fi
+
+        % --- Drawing Logic ---
+        \ifnum\k=0
+            % ORIGINAL SIGNAL (Blue)
+            \draw[thick, blue] (\xlabel,0) -- (\xlabel,\val);
+            \filldraw[blue] (\xlabel,\val) circle (2.5pt);
+            % Axis Ticks
+            \draw (\xlabel, 0.1) -- (\xlabel, -0.1);
+        \else
+            % EXTENSIONS (Solid Orange)
+            \draw[thick, orange] (\xlabel,0) -- (\xlabel,\val);
+            \filldraw[orange] (\xlabel,\val) circle (2.5pt);
+            % Axis Ticks
+            \draw[gray] (\xlabel, 0.1) -- (\xlabel, -0.1);
+        \fi
+    }
+}
+
+% --- Annotations ---
+
+% Brace for Fundamental Period
+\draw[decoration={brace,amplitude=8pt,raise=2ex},decorate,thick, blue] 
+  (0,3.2) -- (7,3.2) 
+  node[midway,above=3.5ex, align=center, blue] {Fundamental Period ($N=8$)};
+
+% Brace for Extension
+\draw[decoration={brace,amplitude=8pt,raise=2ex, mirror},decorate,thick, orange] 
+  (8,-3) -- (15,-3) 
+  node[midway,below=3.5ex, align=center, orange] {Periodic Extension};
+
+% Closing separator
+\draw[dashed, lightgray] (15.5, -3.5) -- (15.5, 3.5);
+
+\end{tikzpicture}
+\end{document}

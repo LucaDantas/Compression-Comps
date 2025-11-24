@@ -1,0 +1,18 @@
+DCT's superior performance in overall compression is due to the fact that the JPEG Compression Standard has entropy coding algorithms tailor-made to
+be effective for quantized DCT. Because of the combination of RLE and heavy quantization of high-frequency components, which results in an abundance of zeroes,
+DCT was able to reach much higher compression ratios than other transforms. Of course, without the clever quantization of components less perceptible to humans,
+the use of RLE would not be able to reach its full potential. The frequent long runs of zeroes allow many values to be represented by just two. With the Haar and S+P
+transforms, a flat predictive encoder was used, which does not decrease the amount of values needed to be represented. Thus, there is a minimum of one bit per value,
+whereas in DCT, RLE is able to theoretically break past this minimum because a long run of zeroes is represented with just one value.
+
+DFT, although not as space-efficient when measured against preserving image quality, saw an increase in compression ratio similar
+to that of DCT when using JPEG-specified entropy coding techniques, which speaks to its structural similarity to DCT.
+The decrease in compression ratio when using a flat linear predictive coder for the Haar and S+P transforms further shows the importance of the structure of
+the transform. DPCM and predictive coders heavily rely on correlation between values, which points to the fact that the order in which the values were encoded
+with predictive coding after the Haar and S+P transforms were not correlated, causing the two transforms to perform worse in compression ratio when entropy
+coding was used.
+So, without taking into account the order in which values may be correlated, which is heavily dependent on transform structure, algorithms such as DPCM and predictive
+coding may actually decrease compression performance.
+
+By taking advantage of the structure of DCT in the quantization and entropy coding steps, the JPEG Compression Standard performs much better
+than the other transforms explored in this project. In the following subsections, we discuss the implications of results for each individual transform.

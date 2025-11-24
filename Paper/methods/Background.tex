@@ -1,0 +1,42 @@
+% Content for Background Methods subsection
+% This file is included in the main conference paper via \input{Background}
+
+Before diving into the individual transform methods, we first explain what transform coding is and why it helps with compression. The idea is to take the original representation of our image, a 2D array of pixel values, and transform it into a new space with lower entropy. The hope is that the result will be easily compressed by the entropy encoding techniques described in Section \ref{methodsec:entropy}.
+
+We do this by considering some original signal, which we will denote as 
+\begin{equation}
+        x=\{x_1,x_2,\dots,x_N\}\label{eq:sig}.
+\end{equation}
+The signal can be thought of as a vector in the vector space $\mathbb{R}^N$. Loosely speaking, a vector space $V$ is any collection of elements where
+\begin{enumerate}
+    \item For all $a,b\in\mathbb{R}$ and $u,v\in V$, $au+bv\in V$.
+    \item There is a unique element $0\in V$ such that for all $v\in V$, $0v=0$ and $v+0=v$.
+\end{enumerate}
+In other words, it is a space that respects and is closed under the normal operation of addition and multiplication on the real numbers $\mathbb{R}$. Vector spaces have many rich theoretical properties, for which the interested reader can refer to the textbook by Broughton \cite{broughton2009discrete}. We will only cover the most essential properties here. A set of vectors $v_1,v_2,\dots,v_k$ is called \textit{linearly independent} if the only solution to the equation
+\begin{equation}
+    c_1v_1+c_2v_2+\dotsb+c_kv_k=0\label{eq:lin_ind}
+\end{equation}
+is that $c_i=0$ for $i=1,2,\dots,k$. A set of linearly independent vectors $v_1,v_2,\dots,v_N$ is called a \textit{basis} if for any vector $u\in V$, there exists numbers $c_1,c_2,\dots,c_N$ such that
+\begin{equation}
+    u=\sum_{i=1}^{N}c_iv_i.
+\end{equation}
+In other words, every member of the vector space can be represented as some weighted sum of vectors in a basis. These weights $c_1,c_2,\dots,c_N$ are called the coefficients. Fig. \ref{fig:2dbasis} illustrates this with one of the simplest examples $\mathbb{R}^2$, where the vectors $\langle0,1\rangle$ and $\langle1,0\rangle$ form a basis. In this example, we get the equation $v=3i+2j$ where $3$ and $2$ are our coefficients.
+\begin{figure}
+    \centering
+    \includestandalone[width=0.6\linewidth]{methods/Fourierdiagrams/BasisExample}
+    \caption{The vectors $\vec{i}$ and $\vec{j}$ form a 2D basis of $\mathbb{R}^2$}
+    \label{fig:2dbasis}
+\end{figure}
+Notably, for any given vector space there are many possible bases. The transform algorithms described in this section are all effectively a \textit{change of basis}, where the new, transformed signal is denoted
+\begin{equation}
+    X=\{X_1,X_2,\dots,X_N\}.\label{eq:tsig}
+\end{equation}
+These new values can be thought of as the coordinates for the signal in the new transformed space. By cleverly choosing a basis, the hope is that more information of the original data is encoded in fewer of the new coefficients.
+
+Applying this to images specifically, if we represent our image as a 2D array of pixels, the resulting transformed image can be acquired by applying the transform to each row and column, as demonstrated in Fig. \ref{fig:2dtransform}.
+\begin{figure}
+    \centering
+    \includestandalone[width=1.0\linewidth]{methods/Fourierdiagrams/2DTransform}
+    \caption{Applying a transform to an image}
+    \label{fig:2dtransform}
+\end{figure}

@@ -1,0 +1,8 @@
+% Content for Huffman Coding Methods subsection
+% This file is included in the main conference paper via \input{HuffmanMethods}
+
+\subsubsection{Huffman Coding}
+
+Huffman coding is an entropy encoding algorithm that serves a crucial role in the final stage of image compression pipelines. The purpose of Huffman coding is to assign variable-length binary codes to symbols based on their frequency of occurrence, with more frequent symbols receiving shorter codes and less frequent symbols receiving longer codes. This approach enables efficient representation of data by reducing the average number of bits required to encode each symbol.
+
+In the context of image compression, Huffman coding is particularly useful because it can achieve near-optimal compression when the symbol frequencies are known. While the transform coding steps (such as DWT, DCT, and DFT) and quantization all aim at reducing the entropy of the image data by concentrating energy and removing redundancy, these steps alone do not actually compress the data if written out directly. Even after these transformations, the data still requires 8 bits per channel per pixel to represent each value. Huffman coding addresses this limitation by exploiting the non-uniform distribution of values in the transformed and quantized data, allowing frequently occurring values to be represented with fewer bits and less frequent values with more bits. This results in a reduction of the total number of bits needed to represent the data in a near-optimal way, at least when comparing to character representation with knowledge only of the character frequencies.

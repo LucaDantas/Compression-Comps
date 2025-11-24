@@ -1,0 +1,22 @@
+% Wan
+
+Our pipeline follows the standard structure of a JPEG-style  system to test transform coding, shown in Fig. 1 (Image Compression Pipeline). Each stage prepares the image for the next, allowing us to isolate the effect of different transforms while keeping the rest of the system fixed.
+
+\begin{figure}[ht]
+    \centering
+    \resizebox{0.95\linewidth}{!}{%
+        \input{methods/figures/PipelineGraph}
+    }
+    \caption{Image compression pipeline.}
+\end{figure}
+
+We begin with a raw RGB image. Because RGB channels are highly correlated, we first convert the image into YCbCr, where luminance (Y) is separated from chrominance (Cb, Cr). This step concentrates most visually important information into a single channel, making subsequent compression more effective. Next, the image is partitioned into blocks as per the specific transform (e.g., 8×8 for DCT/DFT, full-image tiles for Haar and S+P). 
+
+Then, the transform stage is the core of our investigation. Here we substitute one of four transforms (DCT, DFT, Haar, or S+P), while keeping all later steps unchanged, with the exception of routine subband-aware quantization for S+P (described in Section \ref{methodsec:quant}). Each transform maps spatial pixel values into a domain where redundancy is more explicit: DCT and DFT concentrate energy into low-frequency coefficients; Haar and S+P build a multiresolution decomposition. All transforms produce a set of coefficients organized into subbands or frequency components.
+
+These coefficients then undergo quantization, the primary source of loss in the pipeline. Quantization is a nonlinear operation that partitions the range of possible input values into disjoint intervals and assigns each interval a single representative value (the reconstruction level).
+All inputs falling within the same interval are encoded identically, which reduces precision and introduces quantization error. Because transforms ideally decorrelate the signal and push most meaningful information into a small number of coefficients, quantization can discard many small values with limited perceptual impact. This makes quantization the crucial stage where transform quality directly affects rate–distortion behavior.
+
+The quantized coefficients are finally passed into an entropy coding module consisting of prediction (DPCM or linear predictive coding), run-length encoding (RLE) of zeros, and Huffman coding. These operations are lossless and convert long runs of similar or repeated values, introduced by quantization, into compact binary representations.
+
+The output of entropy coding forms the compressed bitstream. Decoding inverts each stage in reverse order. Keeping (virtually) all components except the transform fixed, this pipeline allows us to isolate how each transform influences entropy, compressibility, and reconstruction quality across datasets.

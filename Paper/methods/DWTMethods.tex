@@ -1,0 +1,108 @@
+% Content for DWT Methods subsection
+% This file is included in the main conference paper via \input{DWTMethods}
+
+The Discrete Wavelet Transform (DWT) is a powerful transform coding technique that decomposes signals into a hierarchy of resolution levels, making it particularly well-suited for image compression. In this work we focus on the Haar wavelet, which is the simplest in the family of wavelets used for this transform. For now on we consider an image as a 1D signal, we later discuss how to convert it to 2D.
+
+\subsubsection{One Dimensional Haar Wavelet Transform in Practice}
+
+Consider a 1D signal with $2^k$ values: $$ \{x_1, x_2, \dots, x_{2^k}\}$$ A naive approach to compression might be to store only the average of adjacent values, resulting in the compressed signal $$A_{k-1} = \{(x_1 + x_2) / 2, (x_3 + x_4) / 2, \dots, (x_{2^k-1} + x_{2^k})/2\}$$ Note that this approach clearly loses information. To enable perfect reconstruction of the original signal, we must also preserve the difference between adjacent values: $$D_{k-1} = \{x_1 - (x_1 + x_2) / 2, x_3 - (x_3 + x_4) / 2, \dots\}$$
+Note that the difference of $x_i$ the the mean is completely symmetric to the difference of $x_{i+1}$ to the mean, so we only need to store one detail coefficient. This simple idea is the core of the Haar wavelet transform.
+
+We can apply this operation once and we get a set of $2^k/2$ average coefficients and $2^k/2$ detail coefficients. We can keep applying the operation recursively to the average coefficients until we reach only one pixel of average coefficient. Table~\ref{tab:haar_decomposition} illustrates this process for an 8-pixel signal.
+
+Figure~\ref{fig:haar_decomposition} visualizes this decomposition process, showing the signal (blue) and wavelets (red) at each resolution level. The blue curves represent the averaged signals at decreasing resolutions, while the red curves capture the detail coefficients (differences) that must be preserved for perfect reconstruction.
+
+\begin{table}[h]
+  \centering
+  \caption{Haar decomposition example for an 8-pixel signal}
+  \label{tab:haar_decomposition}
+  \begin{tabular}{c c c}
+    \toprule
+    \textbf{Resolution} & \textbf{Averages} & \textbf{Details} \\
+    \midrule
+    8 & $[5, \; 8, \; 9, \; 7, \; 4, \; 2, \; 1, \; 3]$ & --- \\
+    4 & $[6.5, \; 8, \; 3, \; 2]$ & $[-1.5, \; 1, \; 1, \; -1]$ \\
+    2 & $[7.25, \; 2.5]$ & $[-0.75, \; 0.5]$ \\
+    1 & $[4.875]$ & $[2.375]$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{figure}[ht]
+  \centering
+  \input{methods/DWTdiagrams/haar_decomposition}
+  \caption{Haar wavelet decomposition showing signal (blue) and wavelets (red) at each resolution level.}
+  \label{fig:haar_decomposition}
+\end{figure}
+
+Note that for a given level we can perfectly reconstruct the previous level's average coefficients from the combination of the average coefficient and detail coefficients, so all we need to store in a compression is the set of all detail coefficients and the very last average.
+
+\subsubsection{Theoretical Foundation for Haar Wavelet Transform}
+
+The Haar wavelet transform is founded on a set of nested vector spaces $V^j$ representing piecewise-constant functions at different resolutions, where $V^0 \subset V^1 \subset V^2 \subset \dots$. This nested structure enables a change of basis from the natural basis of scaling functions in $V^{j+1}$ to a basis consisting of the scaling functions from the lower-resolution space $V^j$ together with the wavelet basis functions from the orthogonal complement space $W^j$. The scaling functions provide the coarse approximation, while the wavelets capture the detail information needed for perfect reconstruction. Figure~\ref{fig:basis_functions} visualizes the scaling functions and Haar wavelets for different resolution levels.
+
+\begin{figure*}[hbt]
+  \centering
+  \begin{minipage}{\textwidth}
+    \centering
+    \input{methods/DWTdiagrams/scaling_functions}
+    \subcaption{Scaling functions (basis) for $V^3$: eight piecewise constant functions.}
+    \label{fig:scaling_functions}
+  \end{minipage}
+  \vspace{0.5cm}
+  \begin{minipage}{\textwidth}
+    \centering
+    \input{methods/DWTdiagrams/wavelet_basis}
+    \subcaption{Basis for $V^2$ (blue) and Haar wavelets basis for $W^2$ (red).}
+    \label{fig:wavelet_basis}
+  \end{minipage}
+  \caption{Haar basis: scaling functions for $V^3$ and scaling functions and wavelets for $V^2$ and $W^2$.}
+  \label{fig:basis_functions}
+\end{figure*}
+
+A detailed mathematical exposition of the vector space structure, scaling functions, inner products, orthogonality, and the Haar wavelet basis functions is provided in Appendix \ref{apx:haartheory}.
+
+
+
+
+\subsubsection{Two-Dimensional Haar Wavelet Transform}
+
+The 2D Haar wavelet transform generalizes the 1D "averaging and differencing" filter bank to 2D by alternating between operations on rows and columns at each level of the hierarchy.
+
+\paragraph{The Decomposition Algorithm}
+
+The algorithm proceeds recursively as follows:
+
+\begin{enumerate}
+\item \textbf{Row Step:} First, perform one step of horizontal pairwise averaging and differencing on the pixel values in each row of the image. This splits the image horizontally into averages (left) and details (right).
+
+\item \textbf{Column Step:} Next, apply vertical pairwise averaging and differencing to each column of the result from the Row Step.
+\begin{itemize}
+\item This creates four distinct quadrants of coefficients:
+\begin{itemize}
+\item \textbf{Top-Left:} Averages of averages (coarse approximation).
+\item \textbf{Top-Right:} Averages of horizontal details.
+\item \textbf{Bottom-Left:} Vertical details of horizontal averages.
+\item \textbf{Bottom-Right:} Vertical details of horizontal details (diagonal details).
+\end{itemize}
+\end{itemize}
+
+\item \textbf{Recursion:} To complete the transformation, repeat this process recursively \textit{only} on the quadrant containing the averages in both directions (the top-left quadrant).
+\end{enumerate}
+
+Figure~\ref{fig:encoded_visualization} visualizes this 2D Haar transform decomposition process, showing how an image is decomposed into four quadrants at each level.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.3\textwidth]{methods/DWTdiagrams/encodedVisualization.png}
+  \caption{Visualization of a 2D Haar transform showing the decomposition of an image}
+  \label{fig:encoded_visualization}
+\end{figure}
+
+
+
+
+\subsubsection{Compression Properties}
+
+The Haar wavelet transform is particularly effective for image compression because it naturally concentrates energy in the low-resolution approximation coefficients. The detail coefficients (wavelets) typically have smaller magnitudes and can be more aggressively quantized or discarded in lossy compression scenarios. This energy compaction property, combined with the transform's computational efficiency makes the Haar wavelet an attractive choice for practical image compression systems.
+

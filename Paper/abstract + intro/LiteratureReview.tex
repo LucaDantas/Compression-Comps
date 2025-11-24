@@ -1,0 +1,14 @@
+Claude Shannon's introduction of entropy in the context of information theory sets the stage for much of the theoretical discussion about data compression \cite{shannon}. Entropy is an important metric used to calculate the upper bound for how much a piece of data can be compressed losslessly. 
+
+\paragraph{Empirical entropy of coefficient streams.}
+For a discrete stream of symbols $\{s_1,s_2,\dots,s_n\}$ with frequency of occurrence $\{p_1,p_2,\dots,p_n\}$, we compute
+the Shannon entropy as
+\begin{equation}
+    H = -\sum_{k=1}^n p_k \log_2 p_k,\label{eq:entropy}
+\end{equation}
+which serves as an information-theoretic lower bound on the average number of
+bits needed for lossless coding of that stream. Not limited to just image compression, entropy describes how "random" a string of data is, which directly correlates to the maximum compression ratio it is possible to achieve, where compression ratio is calculated by
+\begin{equation}
+compression\:ratio = \frac{original\:filesize}{compressed\:filesize}\label{eq:cr}.
+\end{equation}
+The JPEG Compression Standard and its specifications are defined in various publications, with Wallace's 1992 paper describing its pipeline \cite{wallace_jpeg_1992}. A more in-depth description of specific implementation techniques used in JPEG is published by Purdue University \cite{BoumanJPEGLab}. The mathematical theory and additional signal processing background is provided in Broughton to provide a basis for both the DFT and DCT \cite{broughton2009discrete}. The analysis and theory of Wavelet Transforms, both with Haar basis and more complex examples are discussed by Stollnitz et al. \cite{stollnitz_wavelet_1} \cite{stollnitz_wavelet_2}. The S+P Transform extends on the ideas of the Haar wavelet, with the original paper released in 1993 \cite{said1993sp}.

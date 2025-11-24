@@ -1,0 +1,38 @@
+
+Many analyses of the Haar and S+P transforms rely on the assumption that adjacent samples in natural images exhibit a positive correlation greater than $1/3$. This condition arises from a simple variance calculation of the Haar lifting step.
+
+Let $c[n]$ be a stationary one-dimensional signal with variance $\sigma^2$ and correlation coefficient
+\[
+\rho \;=\; \frac{\mathrm{Covar}(c[n],\,c[n+1])}{\sigma^2}.
+\]
+
+In the $1$D Haar transform, each pair $(c[2n],\,c[2n+1])$ is mapped to an average and a difference:
+\[
+s[n] = \frac{c[2n] + c[2n+1]}{2}, \qquad
+d_1[n] = c[2n+1] - c[2n].
+\]
+
+Assuming stationarity, the variances of these components are:
+\[
+\mathrm{Var}(s) = \frac{\sigma^2}{2}\,(1 + \rho),
+\qquad
+\mathrm{Var}(d_1) = 2\sigma^2\,(1 - \rho).
+\]
+
+For the transform to be variance-reducing (or at least not variance-increasing), we require that the total output variance not exceed the original variance of the pair:
+\[
+\mathrm{Var}(s) + \mathrm{Var}(d_1) \;\le\; 2\sigma^2.
+\]
+
+Substituting the expressions above yields
+\[
+\frac{\sigma^2}{2}(1 + \rho) + 2\sigma^2(1 - \rho)
+\;\le\;
+2\sigma^2,
+\]
+which simplifies to
+\[
+\rho \;>\; \frac{1}{3}.
+\]
+
+Thus, when the correlation between neighboring samples exceeds $1/3$, the Haar averaging--differencing step reduces redundancy by lowering total variance. Since natural images typically exhibit correlations in the range $0.8$--$0.95$, this condition is amply satisfied in practice, explaining the effectiveness of Haar-based and S+P transforms for decorrelation and compression.

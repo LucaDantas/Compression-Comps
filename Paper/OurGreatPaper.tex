@@ -1,0 +1,163 @@
+\documentclass[conference]{IEEEtran}
+
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\usepackage{standalone}
+\usetikzlibrary{matrix, arrows.meta, positioning}
+\usetikzlibrary{shapes,arrows,positioning,decorations.pathreplacing,calc,fit,backgrounds}
+\pgfplotsset{compat=1.14}
+\usepackage{booktabs}
+\usepackage{subcaption}
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\definecolor{MyBlue}{RGB}{45, 114, 178}
+\definecolor{MyLightBlue}{RGB}{230, 240, 255}
+\definecolor{VectorColor}{RGB}{45, 114, 178}
+\definecolor{PointColor}{RGB}{213, 94, 0}
+
+\begin{document}
+
+\title{Transformer Zoo: A Comprehensive Analysis of Transform Coding in Image Compression\\
+}
+
+\author{\IEEEauthorblockN{1\textsuperscript{st} Luca Araujo}
+\IEEEauthorblockA{\textit{Computer Science Department} \\
+\textit{Carleton College}\\
+Northfield, United States \\
+araujol@carleton.edu}
+\and
+\IEEEauthorblockN{2\textsuperscript{nd} Joshua Lee}
+\IEEEauthorblockA{\textit{Computer Science Department} \\
+\textit{Carleton College}\\
+Northfield, United States \\
+leej12@carleton.edu}
+\and
+\IEEEauthorblockN{3\textsuperscript{rd} Indy Lyness}
+\IEEEauthorblockA{\textit{Computer Science Department} \\
+\textit{Carleton College}\\
+Northfield, United States \\
+lynessi@carleton.edu}
+\and
+\IEEEauthorblockN{4\textsuperscript{th} Jiale Wan}
+\IEEEauthorblockA{\textit{Computer Science Department} \\
+\textit{Carleton College}\\
+Northfield, United States \\
+wanj2@carleton.edu}
+}
+
+\maketitle
+
+\begin{abstract}
+\input{abstract + intro/Abstract}
+\end{abstract}
+
+\section{Introduction}
+\label{sec:intro}
+\input{abstract + intro/Introduction.tex}
+
+\section{Literature Review}
+\label{sec:lit review}
+\input{abstract + intro/LiteratureReview.tex}
+
+\section{Methods}
+\label{sec:methods}
+\subsection{Pipeline}
+\label{methodsec:pipeline}
+\input{methods/Pipeline}
+\subsection{Background}
+\label{methodsec:background}
+\input{methods/Background.tex}
+\subsection{Discrete Wavelet Transform}
+Luca
+\input{methods/DWTMethods}
+\label{methodsec:DWT}
+
+\subsection{Discrete Fourier and Cosine Transforms}
+\input{methods/FourierMethods}
+\label{methodsec:fourier}
+
+
+\input{methods/S+P.tex}
+\label{methodsec:sp}
+
+\subsection{Quantization}
+\label{methodsec:quant}
+\input{methods/QuantizationMethods}
+
+\subsection{Entropy Coding}
+\label{methodsec:entropy}
+\input{methods/EntropyMethods}
+
+Luca
+\input{methods/HuffmanMethods}
+
+\section{Results}
+\label{sec:results}
+
+\subsection{Experimental Setup}
+\input{results/ExperimentalSetup}
+
+\subsection{Metrics}
+\input{results/Metrics}
+\label{resultssec:metrics}
+
+\subsection{Collective Results}
+\label{resultssec:col}
+\input{results/CollectiveResults}
+
+\subsection{DWT Results}
+\label{resultssec:DWT}
+\input{results/DWTResults}
+
+\subsection{DCT Results}
+\label{resultssec:DCT}
+\input{results/DCTResults}
+
+
+\input{results/SPResults}
+\label{resultssec:SP}
+
+\section{Discussion}
+\label{sec:discussion}
+
+\label{discussionsec:Collective}
+\input{discussion/CollectiveDiscussion}
+
+\label{discussionsec:DWT}
+\subsection{Discussion: DWT}
+\input{discussion/DWTDiscussion}
+
+\label{discussionsec:sp}
+\subsection{Discussion: S+P}
+\input{discussion/S+P vs. Haar}
+
+\label{discussionsec:fourier}
+\subsection{Discussion: DCT + DFT}
+\input{discussion/DCT+DFTDiscussion}
+
+
+
+\appendices
+\section{Theoretical Foundation for Haar Wavelet Transform}
+\label{apx:haartheory}
+\input{appendix/DWTTheoreticalFoundation}
+\section{The ``Correlation $> 1/3$'' Condition in Haar and S+P}
+\input{appendix/CorrelationCoeff}
+\section{S+P Frequency domain interpretation}
+\input{appendix/SP_FreqDomain}
+\section{The Fast Fourier Transform}
+\label{apx:fft}
+\input{appendix/FFTImplementation}
+\section*{Acknowledgment}
+We would like to thank our advisor Layla Oesper for all her help throughout this project.
+
+\input{Bibliography}
+
+\end{document}
